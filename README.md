@@ -5,7 +5,7 @@
 > Web-based laser cutter control — draw, edit and laser from your browser, hosted on a small PC (e.g. Raspberry Pi) right at the machine, or locally on Windows/Linux.
 
 <p align="center">
-  <img src="docs/images/overview.png" alt="TheBurner Overview / Übersicht" width="800">
+  <img width="1790" height="1366" alt="image" src="https://github.com/user-attachments/assets/b6b48261-b762-420c-8eaa-de5a2a32061c" />
 </p>
 
 ---
