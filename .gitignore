@@ -1,0 +1,34 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- PyInstaller build artifacts ---
+build/
+dist/
+*.spec
+
+# --- Runtime / user data (created at runtime) ---
+# Materialbibliothek (gerätespezifisch) / device-specific material library
+materials.json
+# gespeicherte Projekte / saved projects
+laser_projekt.json
+*.gcode
+
+# --- Fonts (check license before redistributing) ---
+TTF/
+
+# --- Example / test SVGs (move to examples/ if you want to keep them) ---
+path1.svg
+path2.svg
+Zeichnung.svg
+
+# --- Tooling / IDE / OS ---
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
