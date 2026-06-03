@@ -199,7 +199,7 @@ Speichern/Laden des kompletten Projekts (siehe [13](#13-projekt-speichern--laden
 
 Erzeugt ein Rechteck bzw. einen Kreis im Arbeitsbereich. Größe und Position werden danach mit den Maus-Griffen oder über die **Bemaßungs-Maßzahlen** geändert (Klick auf die angezeigte Maßzahl öffnet ein Eingabefeld).
 
-<img width="267" height="256" alt="image" src="https://github.com/user-attachments/assets/115d01b3-c829-4679-8133-73256abc056e" />
+<img width="670" height="357" alt="image" src="https://github.com/user-attachments/assets/836ce25f-8282-4f04-9300-3e64e07c6d12" />
 
 ### 7.2 ✒️ Linienzug (Polylinie)
 
