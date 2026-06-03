@@ -213,7 +213,7 @@
 
         /* Schwebende Bemaßungs-Eingabefelder */
         .floating-dim {
-            position: absolute;
+            position: fixed;        /* viewport-bezogen, aus dem Flex-Fluss des Body genommen */
             z-index: 5000;
             width: 80px;
             text-align: center;
@@ -2453,8 +2453,13 @@
             }
 
             inputEl.value = val.toFixed(2);
-            inputEl.style.left = (e.clientX - 40) + 'px'; 
-            inputEl.style.top = (e.clientY - 15) + 'px';
+            // Position am Klick (viewport-bezogen, da position:fixed), in den Bildschirm geklemmt
+            let cx = (e && typeof e.clientX === 'number') ? e.clientX : window.innerWidth / 2;
+            let cy = (e && typeof e.clientY === 'number') ? e.clientY : window.innerHeight / 2;
+            let left = Math.max(4, Math.min(cx - 40, window.innerWidth - 94));
+            let top  = Math.max(4, Math.min(cy - 15, window.innerHeight - 40));
+            inputEl.style.left = left + 'px';
+            inputEl.style.top = top + 'px';
             inputEl.style.display = 'block';
             
             setTimeout(() => {
