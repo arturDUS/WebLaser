@@ -71,7 +71,8 @@ python agent.py
 
 Beim Start öffnet sich der Browser automatisch auf `http://localhost:8080`. Im Netzwerk: `http://<IP-des-Hosts>:8080`.
 
-> 📷 **Screenshot:** `docs/images/startup.png` — Konsole nach dem Start mit „Agent verbunden".
+<img width="276" height="53" alt="image" src="https://github.com/user-attachments/assets/53448762-df57-4643-bce9-1ceecda9d85d" />
+
 
 ---
 
@@ -79,24 +80,7 @@ Beim Start öffnet sich der Browser automatisch auf `http://localhost:8080`. Im 
 
 Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeitsbereich** (Mitte) und **rechte Leiste** (Werkzeuge/Ebenen).
 
-```
-┌──────────────┬──────────────────────────────────┬──────────────────┐
-│  ⚙️ Maschine  │  Arbeitsbereich  [🌐][⛶ 🔲 1:1][🎯 📍] │  🛠️ Werkzeuge     │
-│              │  ┌────────────────────────────┐  │  ▭ ◯ ✒️ T ⭐     │
-│  🎛️ Job       │  │      Lineal X              │  │  📦 ▦ │ 🔗 ⛓️‍💥   │
-│  Kontrolle    │  │ L │                       │  │  ⇤ ↔ ⇥ │ ⤒ ↕ ⤓  │
-│              │  │ i │   Zeichenfläche         │  │  📥 Importieren  │
-│  🕹️ Steuerung │  │ n │   (mm-Raster)          │  │  📐 SVG  🖼️ Bild  │
-│  & Konsole    │  │ e │                       │  │                  │
-│  [Log]        │  │ a │                       │  │  📋 Objekte &     │
-│              │  │ l │                       │  │     Ebenen       │
-│              │  └────────────────────────────┘  │  [Tabelle]       │
-│              │                                  │  ⚙️ Ebenen-Param. │
-│              │                                  │  💾 Projektverw.  │
-└──────────────┴──────────────────────────────────┴──────────────────┘
-```
-
-> 📷 **Screenshot:** `docs/images/overview.png` — Gesamtansicht der Oberfläche.
+<img width="1753" height="1246" alt="image" src="https://github.com/user-attachments/assets/4bb4f4b4-7bce-4595-b722-4f4f1dab2f19" />
 
 **Panels ein-/ausklappen:** Jede Panel-Überschrift (z. B. „🛠️ Werkzeuge") hat einen kleinen Pfeil **▾/▸**. Klick darauf rollt das Panel zusammen, sodass nur die Überschrift bleibt. Bei wenig Bildschirmhöhe lässt sich die ganze Leiste scrollen.
 
@@ -108,7 +92,7 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 
 ### 4.1 ⚙️ Maschine
 
-> 📷 **Screenshot:** `docs/images/panel-machine.png`
+<img width="324" height="318" alt="image" src="https://github.com/user-attachments/assets/ad3f977c-eb85-44d1-91ea-4ee48a4e8908" />
 
 | Element | Funktion |
 |---|---|
@@ -122,7 +106,7 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 
 ### 4.2 🎛️ Job Kontrolle
 
-> 📷 **Screenshot:** `docs/images/panel-job.png`
+<img width="321" height="182" alt="image" src="https://github.com/user-attachments/assets/94076b32-2cb2-41b8-b134-19266ec5d605" />
 
 | Element | Funktion |
 |---|---|
@@ -132,8 +116,7 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 | Fortschrittsbalken | Zeigt den Bearbeitungsfortschritt in %. |
 
 ### 4.3 🕹️ Steuerung & Konsole
-
-> 📷 **Screenshot:** `docs/images/panel-control.png`
+<img width="327" height="657" alt="image" src="https://github.com/user-attachments/assets/6494e2bf-0dc2-4da1-89fc-64ffde0e84df" />
 
 | Element | Funktion |
 |---|---|
@@ -143,6 +126,8 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 | **Pumpe EIN/AUS** | Absaugung/Luft manuell schalten (`M8`/`M9`) |
 | **🎯 Grafischer Jog-Controller** | Öffnet ein rundes Bedienfeld zum Verfahren der Achsen per Mausklick |
 | **[Log]** | Konsolen-Ausgabe (Befehle, Antworten, Fehler) |
+
+<img width="410" height="502" alt="image" src="https://github.com/user-attachments/assets/fe5cb0e6-6bc2-4959-ac58-4b99aea73fa2" />
 
 ---
 
@@ -160,8 +145,9 @@ Die Zeichenfläche zeigt ein **mm-Raster** mit Linealen. Die obere Leiste enthä
 | **📍** | Nullpunkt (Ursprung) per Klick setzen |
 
 **Navigation:** Mausrad = Zoom, Ziehen mit der Maus = Auswahl/Verschieben. Der violette Marker 📍 zeigt den Nullpunkt, das rote Fadenkreuz die aktuelle Laserposition.
+<img width="1044" height="57" alt="image" src="https://github.com/user-attachments/assets/d58f7cf0-a1eb-42ed-b609-addc9ed1dcae" />
 
-> 📷 **Screenshot:** `docs/images/workspace-toolbar.png` — obere Leiste des Arbeitsbereichs.
+<img width="1019" height="107" alt="image" src="https://github.com/user-attachments/assets/d5d7e7a7-68d2-4152-915e-f69dbaddaa87" />
 
 ---
 
@@ -169,7 +155,7 @@ Die Zeichenfläche zeigt ein **mm-Raster** mit Linealen. Die obere Leiste enthä
 
 ### 6.1 🛠️ Werkzeuge
 
-> 📷 **Screenshot:** `docs/images/panel-tools.png`
+<img width="322" height="341" alt="image" src="https://github.com/user-attachments/assets/9ed21025-d370-4a4b-89e4-d6522415715b" />
 
 Die Werkzeuge sind in beschriftete Zeilen gruppiert:
 
@@ -190,7 +176,7 @@ Die Werkzeuge sind in beschriftete Zeilen gruppiert:
 
 Tabelle aller Objekte. Pro Zeile: **Typ**, **Aktion** (Dropdown: ✂️ Schneiden / 🔥 Gravieren / 📏 Hilfslinie / ❌ Ignorieren) und ein **🗑️ Löschen**-Button.
 
-> 📷 **Screenshot:** `docs/images/panel-objects.png`
+<img width="324" height="656" alt="image" src="https://github.com/user-attachments/assets/9941d297-904e-4b5f-b7f6-c3250daf7488" />
 
 ### 6.4 ⚙️ Ebenen-Parameter
 
@@ -213,7 +199,7 @@ Speichern/Laden des kompletten Projekts (siehe [13](#13-projekt-speichern--laden
 
 Erzeugt ein Rechteck bzw. einen Kreis im Arbeitsbereich. Größe und Position werden danach mit den Maus-Griffen oder über die **Bemaßungs-Maßzahlen** geändert (Klick auf die angezeigte Maßzahl öffnet ein Eingabefeld).
 
-> 📷 **Screenshot:** `docs/images/draw-rect.png` — Rechteck mit Bemaßung.
+<img width="267" height="256" alt="image" src="https://github.com/user-attachments/assets/115d01b3-c829-4679-8133-73256abc056e" />
 
 ### 7.2 ✒️ Linienzug (Polylinie)
 
@@ -223,19 +209,19 @@ Klicke nacheinander Punkte, um einen Linienzug zu zeichnen. **ESC** beendet das 
 - **Magnet-Snapping:** In der Nähe anderer Objekte rastet der Cursor auf Endpunkte (stark, cyan), Kreuzungen (grün) oder Kanten (schwach, orange) ein. **Alt** gedrückt halten deaktiviert den Magneten kurzzeitig.
 - **Bearbeiten:** *Einfachklick* auf ein Segment/Handle wählt es einzeln (Länge per Maßzahl änderbar, Eckpunkt per blauem Handle verschiebbar). *Doppelklick* wählt den **gesamten** Linienzug zum Verschieben/Drehen/Skalieren.
 
-> 📷 **Screenshot:** `docs/images/polyline-snap.png` — Magnet-Snapping beim Zeichnen.
+<img width="240" height="201" alt="image" src="https://github.com/user-attachments/assets/df2e9432-b9cb-4c7c-8fbd-47385653c169" />
 
 ### 7.3 T Text
 
 Öffnet den Text-Dialog. Eingabe von Text, Schrifthöhe und einer **TTF/OTF-Schriftart** (Button „📂 Schrift laden"). Der Text wird als **echter Vektor-Pfad** eingefügt (kein Bitmap), direkt laserbar. Eine Live-Vorschau zeigt den Laser-Fahrweg.
 
-> 📷 **Screenshot:** `docs/images/dialog-text.png`
+<img width="408" height="416" alt="image" src="https://github.com/user-attachments/assets/6e91009e-891e-4cf0-9d01-7011c933b598" />
 
 ### 7.4 ⭐ Formen-Bibliothek
 
 14 parametrische Formen: **Stern, Herz, Trapez, Parallelogramm, Sechseck, Fünfeck, Achteck, Dreieck, Pfeil, Kreuz, Tonne, Zahnrad, Blitz, Stadion**. Form anklicken, Parameter eingeben, *Einfügen*. Die Form landet mittig im sichtbaren Bereich und ist sofort bearbeitbar.
 
-> 📷 **Screenshot:** `docs/images/dialog-shapes.png`
+<img width="607" height="412" alt="image" src="https://github.com/user-attachments/assets/f9688e54-528f-4869-819f-7b08ffdbbc05" />
 
 ---
 
@@ -245,7 +231,7 @@ Klicke nacheinander Punkte, um einen Linienzug zu zeichnen. **ESC** beendet das 
 
 Erzeugt fertige Schnittteile für Kästen mit **Finger-/Kerbverbindungen**.
 
-> 📷 **Screenshot:** `docs/images/dialog-box.png`
+<img width="489" height="657" alt="image" src="https://github.com/user-attachments/assets/506fa42c-8702-4557-8c72-2688c29cdda5" />
 
 **Box-Typen:**
 
@@ -267,7 +253,7 @@ Erzeugt fertige Schnittteile für Kästen mit **Finger-/Kerbverbindungen**.
 
 Dupliziert die aktuelle Auswahl in einem Raster: Spalten/Zeilen und Abstände in X/Y.
 
-> 📷 **Screenshot:** `docs/images/dialog-array.png`
+<img width="369" height="277" alt="image" src="https://github.com/user-attachments/assets/b7aee717-c027-4b61-8ece-61c2b4173475" />
 
 ---
 
@@ -290,7 +276,8 @@ Mehrere Objekte auswählen (das **zuerst** angeklickte ist die Referenz), dann e
 
 > 💡 Für eine definierte Referenz die Objekte **einzeln mit Shift** anklicken (nicht per Rahmen).
 
-> 📷 **Screenshot:** `docs/images/align.png` — vorher/nachher.
+<img width="584" height="285" alt="image" src="https://github.com/user-attachments/assets/f1e5cbc1-de64-4167-83d3-cf2f7c464851" />
+<img width="632" height="257" alt="image" src="https://github.com/user-attachments/assets/722b7648-359d-4a1d-9b95-ccb6b4eab521" />
 
 ---
 
@@ -302,7 +289,9 @@ Lädt eine SVG-Datei und zerlegt sie in **freie Einzelteile**, die einzeln bearb
 
 ### 10.2 Foto-Gravur
 
-> 📷 **Screenshot:** `docs/images/dialog-photo.png`
+<img width="507" height="695" alt="image" src="https://github.com/user-attachments/assets/f703ecb7-47ab-4119-8cfa-393cb8ef734e" />
+
+<img width="556" height="562" alt="image" src="https://github.com/user-attachments/assets/a57505b8-7061-4b80-b0c4-50584950343a" />
 
 Foto über **🖼️ Bild** laden → wird automatisch in **Graustufen** gewandelt und mittig platziert. Auswahl des Fotos + erneuter Klick auf **🖼️** öffnet den Dialog.
 
@@ -338,7 +327,7 @@ Die Parameter (Speed/Power/Durchläufe) gelten global je Ebene und werden im Ber
 
 ### 11.2 Materialbibliothek
 
-> 📷 **Screenshot:** `docs/images/dialog-material.png`
+<img width="768" height="493" alt="image" src="https://github.com/user-attachments/assets/82e0ee07-b740-404d-8eed-3f7d3a745217" />
 
 Tabelle aller Materialien mit Schnitt- und Gravur-Parametern (Speed/Power/Durchläufe). Pro Zeile:
 - **↩ Nutzen** — Parameter in die Hauptfelder übernehmen
@@ -352,7 +341,7 @@ Tabelle aller Materialien mit Schnitt- und Gravur-Parametern (Speed/Power/Durchl
 
 Ermittelt die optimalen Laserparameter für ein neues Material — analog zu LightBurn-Testmustern.
 
-> 📷 **Screenshot:** `docs/images/dialog-mattest.png`
+<img width="526" height="679" alt="image" src="https://github.com/user-attachments/assets/1a948f1d-2005-4eea-b081-6df80b0c7b73" />
 
 **Ablauf:**
 1. In der Materialbibliothek **🧪 Parameter-Test erzeugen**.
@@ -363,7 +352,7 @@ Ermittelt die optimalen Laserparameter für ein neues Material — analog zu Lig
 6. Nach dem Lasern erscheint die **Bewertung**: beste Spalte/Reihe eingeben → Speed/Power werden aufgelöst. Bei zu schwachem Ergebnis **➕ Weiteren Durchlauf lasern** (zählt automatisch hoch).
 7. Name eingeben → **💾 Als Material speichern** (mit der aufgelaufenen Durchlaufzahl).
 
-> 📷 **Screenshot:** `docs/images/dialog-eval.png` — Bewertungsdialog.
+<img width="276" height="266" alt="image" src="https://github.com/user-attachments/assets/b09e6058-4efb-408f-baf2-1102ff0e8c98" />
 
 ---
 
@@ -381,7 +370,7 @@ Ermittelt die optimalen Laserparameter für ein neues Material — analog zu Lig
 
 Über das 🌐-Dropdown oben im Arbeitsbereich: **Deutsch, English, Español, 中文**. Die Wahl wird im Browser gespeichert (`localStorage`) und beim nächsten Start automatisch wieder eingestellt. Übersetzt sind die Hauptoberfläche und die Dialoge.
 
-> 📷 **Screenshot:** `docs/images/language.png` — Sprach-Dropdown.
+<img width="116" height="145" alt="image" src="https://github.com/user-attachments/assets/a6b57737-7c22-4036-b425-6b9e271fae7c" />
 
 ---
 
