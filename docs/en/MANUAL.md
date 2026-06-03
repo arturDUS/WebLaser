@@ -79,24 +79,7 @@ On start the browser opens automatically at `http://localhost:8080`. On the netw
 
 The interface has three areas: **left sidebar** (machine/control), **workspace** (center) and **right sidebar** (tools/layers).
 
-```
-┌──────────────┬──────────────────────────────────┬──────────────────┐
-│  ⚙️ Machine   │  Workspace   [🌐][⛶ 🔲 1:1][🎯 📍]   │  🛠️ Tools         │
-│              │  ┌────────────────────────────┐  │  ▭ ◯ ✒️ T ⭐     │
-│  🎛️ Job       │  │      Ruler X              │  │  📦 ▦ │ 🔗 ⛓️‍💥   │
-│  Control      │  │ R │                       │  │  ⇤ ↔ ⇥ │ ⤒ ↕ ⤓  │
-│              │  │ u │   Canvas               │  │  📥 Import       │
-│  🕹️ Control   │  │ l │   (mm grid)           │  │  📐 SVG  🖼️ Image │
-│  & Console    │  │ e │                       │  │                  │
-│  [Log]        │  │ r │                       │  │  📋 Objects &    │
-│              │  │ Y │                       │  │     Layers       │
-│              │  └────────────────────────────┘  │  [table]         │
-│              │                                  │  ⚙️ Layer params  │
-│              │                                  │  💾 Project       │
-└──────────────┴──────────────────────────────────┴──────────────────┘
-```
-
-> 📷 **Screenshot:** `docs/images/overview.png` — full interface.
+<img width="2218" height="1367" alt="image" src="https://github.com/user-attachments/assets/374ef1c0-805c-476e-a56a-7c069fd1bae1" />
 
 **Collapse/expand panels:** Each panel heading (e.g. "🛠️ Tools") has a small arrow **▾/▸**. Clicking it rolls the panel up so only the heading remains. When screen height is low, the whole sidebar scrolls.
 
@@ -108,7 +91,7 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 
 ### 4.1 ⚙️ Machine
 
-> 📷 **Screenshot:** `docs/images/panel-machine.png`
+<img width="322" height="315" alt="image" src="https://github.com/user-attachments/assets/9c4f2d5f-fef3-4dcf-8bdf-18ff35a3d375" />
 
 | Element | Function |
 |---|---|
@@ -122,7 +105,7 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 
 ### 4.2 🎛️ Job Control
 
-> 📷 **Screenshot:** `docs/images/panel-job.png`
+<img width="323" height="183" alt="image" src="https://github.com/user-attachments/assets/bf8c4a51-b1a5-4c51-befc-e70e46203fb9" />
 
 | Element | Function |
 |---|---|
@@ -133,7 +116,7 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 
 ### 4.3 🕹️ Control & Console
 
-> 📷 **Screenshot:** `docs/images/panel-control.png`
+<img width="321" height="768" alt="image" src="https://github.com/user-attachments/assets/cbc98bf1-17f1-439f-96ed-c1ea0b4ef5ae" />
 
 | Element | Function |
 |---|---|
@@ -143,6 +126,8 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 | **Pump ON/OFF** | Toggle extraction/air manually (`M8`/`M9`) |
 | **🎯 Graphical Jog Controller** | Opens a round control to jog the axes by mouse click |
 | **[Log]** | Console output (commands, responses, errors) |
+
+<img width="406" height="499" alt="image" src="https://github.com/user-attachments/assets/71a49623-fc1b-4061-aa7d-d092aa35159f" />
 
 ---
 
@@ -161,7 +146,8 @@ The canvas shows a **mm grid** with rulers. The top bar contains:
 
 **Navigation:** mouse wheel = zoom, mouse drag = select/move. The purple marker 📍 shows the origin, the red crosshair the current laser position.
 
-> 📷 **Screenshot:** `docs/images/workspace-toolbar.png` — workspace top bar.
+<img width="1489" height="46" alt="image" src="https://github.com/user-attachments/assets/f34e3e27-8aad-4c5f-ad5d-6429de5869e0" />
+<img width="1486" height="110" alt="image" src="https://github.com/user-attachments/assets/4f40818b-ff59-415b-b4c6-085e59f5ed55" />
 
 ---
 
@@ -169,7 +155,7 @@ The canvas shows a **mm grid** with rulers. The top bar contains:
 
 ### 6.1 🛠️ Tools
 
-> 📷 **Screenshot:** `docs/images/panel-tools.png`
+<img width="320" height="338" alt="image" src="https://github.com/user-attachments/assets/74f286c7-d6c7-4c30-8da9-eb9b644d8344" />
 
 The tools are grouped into labeled rows:
 
@@ -190,7 +176,7 @@ The tools are grouped into labeled rows:
 
 Table of all objects. Per row: **Type**, **Action** (dropdown: ✂️ Cut / 🔥 Engrave / 📏 Guide / ❌ Ignore) and a **🗑️ Delete** button.
 
-> 📷 **Screenshot:** `docs/images/panel-objects.png`
+<img width="323" height="772" alt="image" src="https://github.com/user-attachments/assets/72caf641-78a8-4706-b2d6-615805254336" />
 
 ### 6.4 ⚙️ Layer Parameters
 
@@ -213,7 +199,7 @@ Save/load the complete project (see [13](#13-save--load-project)). Located at th
 
 Creates a rectangle or circle on the canvas. Size and position are then changed with the mouse handles or via the **dimension labels** (clicking a displayed dimension opens an input field).
 
-> 📷 **Screenshot:** `docs/images/draw-rect.png` — rectangle with dimensions.
+<img width="653" height="339" alt="image" src="https://github.com/user-attachments/assets/56e50461-ca31-4894-854a-97456539cede" />
 
 ### 7.2 ✒️ Polyline
 
@@ -223,19 +209,19 @@ Click points one after another to draw a polyline. **ESC** finishes.
 - **Magnet snapping:** near other objects the cursor snaps to endpoints (strong, cyan), intersections (green) or edges (weak, orange). Hold **Alt** to temporarily disable the magnet.
 - **Editing:** *single click* on a segment/handle selects it individually (length editable via dimension label, vertex movable via blue handle). *Double click* selects the **entire** polyline for move/rotate/scale.
 
-> 📷 **Screenshot:** `docs/images/polyline-snap.png` — magnet snapping while drawing.
+<img width="305" height="246" alt="image" src="https://github.com/user-attachments/assets/0c9629c7-ba8f-4952-a89e-edc0c6cc9335" />
 
 ### 7.3 T Text
 
 Opens the text dialog. Enter text, font height and a **TTF/OTF font** (button "📂 Load font"). The text is inserted as a **true vector path** (no bitmap), ready to laser. A live preview shows the laser path.
 
-> 📷 **Screenshot:** `docs/images/dialog-text.png`
+<img width="405" height="415" alt="image" src="https://github.com/user-attachments/assets/158db16e-7675-4559-a180-93927951fb23" />
 
 ### 7.4 ⭐ Shape Library
 
 14 parametric shapes: **star, heart, trapezoid, parallelogram, hexagon, pentagon, octagon, triangle, arrow, cross, barrel, gear, lightning, stadium**. Click a shape, enter parameters, *Insert*. The shape appears centered in the visible area and is immediately editable.
 
-> 📷 **Screenshot:** `docs/images/dialog-shapes.png`
+<img width="606" height="413" alt="image" src="https://github.com/user-attachments/assets/8220430b-0928-442e-b7d6-c2abef1c1772" />
 
 ---
 
@@ -245,7 +231,7 @@ Opens the text dialog. Enter text, font height and a **TTF/OTF font** (button "�
 
 Creates ready-to-cut parts for boxes with **finger/notch joints**.
 
-> 📷 **Screenshot:** `docs/images/dialog-box.png`
+<img width="487" height="660" alt="image" src="https://github.com/user-attachments/assets/af261e83-f060-43fc-9b87-1ad1332aa294" />
 
 **Box types:**
 
@@ -267,7 +253,7 @@ Creates ready-to-cut parts for boxes with **finger/notch joints**.
 
 Duplicates the current selection in a grid: columns/rows and X/Y spacing.
 
-> 📷 **Screenshot:** `docs/images/dialog-array.png`
+<img width="462" height="600" alt="image" src="https://github.com/user-attachments/assets/f5fe886e-7ae8-4daa-b43a-c62ab99757cd" />
 
 ---
 
@@ -290,7 +276,8 @@ Select multiple objects (the one clicked **first** is the reference), then choos
 
 > 💡 For a defined reference, click the objects **one by one with Shift** (not via a rubber-band box).
 
-> 📷 **Screenshot:** `docs/images/align.png` — before/after.
+<img width="690" height="384" alt="image" src="https://github.com/user-attachments/assets/a73917bd-961c-4c2d-bfba-bed56b86300a" />
+<img width="715" height="260" alt="image" src="https://github.com/user-attachments/assets/06d604fc-cdb7-4ad6-bc3a-bb2176d15775" />
 
 ---
 
@@ -302,7 +289,7 @@ Loads an SVG file and splits it into **free individual parts** that can be edite
 
 ### 10.2 Photo Engraving
 
-> 📷 **Screenshot:** `docs/images/dialog-photo.png`
+<img width="505" height="710" alt="image" src="https://github.com/user-attachments/assets/bf03efa2-4cf7-4f11-b95c-e6121fd68638" />
 
 Load a photo via **🖼️ Image** → it is automatically converted to **grayscale** and centered. Select the photo + click **🖼️** again to open the dialog.
 
@@ -318,6 +305,7 @@ Load a photo via **🖼️ Image** → it is automatically converted to **graysc
 | **Dithering (B/W)** | Floyd-Steinberg → laser on/off per pixel, constant power. Often the best photo result on wood/paper. |
 
 **Further parameters:** resolution (mm/pixel), speed, power min/max, white threshold. The raster G-code is generated line by line in the frontend (rotation, scaling and clip are handled correctly).
+<img width="620" height="626" alt="image" src="https://github.com/user-attachments/assets/cd54e8e8-1f29-472d-87de-1a6d48ec2209" />
 
 ---
 
@@ -338,7 +326,7 @@ The parameters (speed/power/passes) apply globally per layer and are set in the 
 
 ### 11.2 Material Library
 
-> 📷 **Screenshot:** `docs/images/dialog-material.png`
+<img width="767" height="489" alt="image" src="https://github.com/user-attachments/assets/28537746-dade-4e36-9aee-031781d809a5" />
 
 Table of all materials with cut and engrave parameters (speed/power/passes). Per row:
 - **↩ Use** — apply parameters to the main fields
@@ -363,7 +351,8 @@ Determines the optimal laser parameters for a new material — similar to LightB
 6. After lasering, the **evaluation** appears: enter the best column/row → speed/power are resolved. If the result is too weak, **➕ Laser another pass** (counts up automatically).
 7. Enter a name → **💾 Save as material** (with the accumulated pass count).
 
-> 📷 **Screenshot:** `docs/images/dialog-eval.png` — evaluation dialog.
+<img width="530" height="681" alt="image" src="https://github.com/user-attachments/assets/2fe51785-7853-4910-823a-0e54b854dcbc" />
+<img width="205" height="200" alt="image" src="https://github.com/user-attachments/assets/58e4366e-7248-4204-a882-d2daf2341e0a" />
 
 ---
 
@@ -381,7 +370,7 @@ Determines the optimal laser parameters for a new material — similar to LightB
 
 Via the 🌐 dropdown at the top of the workspace: **German, English, Spanish, Chinese**. The choice is stored in the browser (`localStorage`) and restored automatically on the next start. The main UI and the dialogs are translated.
 
-> 📷 **Screenshot:** `docs/images/language.png` — language dropdown.
+<img width="116" height="146" alt="image" src="https://github.com/user-attachments/assets/c0f92a2e-8338-4474-9f31-c9c77870eb15" />
 
 ---
 
