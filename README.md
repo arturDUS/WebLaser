@@ -34,7 +34,15 @@
 - **Projekt:** Speichern/Laden aller Objekte (inkl. Bilder & SVG) mit Datei-Dialog
 - **Mehrsprachig:** Deutsch, English, Español, 中文
 
-### 🚀 Schnellstart
+### 🚀 Download & Schnellstart
+
+**🪟 Windows (fertige Anwendung — kein Python nötig):**
+
+➜ **[agent.exe herunterladen](https://github.com/arturDUS/WebLaser/releases/latest/download/agent.exe)** (neuestes Release)
+
+Doppelklick auf `agent.exe` startet den Server und öffnet den Browser automatisch.
+
+**🐧 Linux / Raspberry Pi / aus dem Quellcode:**
 
 ```bash
 # Abhängigkeiten installieren
@@ -116,7 +124,15 @@ MIT — siehe [Lizenz / License](#-lizenz--license) am Ende.
 - **Project:** save/load all objects (incl. images & SVG) via a file dialog
 - **Multilingual:** Deutsch, English, Español, 中文
 
-### 🚀 Quick Start
+### 🚀 Download & Quick Start
+
+**🪟 Windows (ready-to-run app — no Python required):**
+
+➜ **[Download agent.exe](https://github.com/arturDUS/WebLaser/releases/latest/download/agent.exe)** (latest release)
+
+Double-click `agent.exe` to start the server and open the browser automatically.
+
+**🐧 Linux / Raspberry Pi / from source:**
 
 ```bash
 # Install dependencies
