@@ -66,6 +66,45 @@
         .panel.collapsed > *:not(:first-child) { display: none !important; }
         .panel.collapsed { flex-grow: 0 !important; }
         .panel-arrow { color: #888; font-size: 12px; }
+
+        /* Runde Industrie-Taster (Start / Not-Aus) */
+        .btn-round {
+            width: 104px;
+            height: 104px;
+            border-radius: 50%;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 5px 12px rgba(0,0,0,0.55), inset 0 3px 8px rgba(255,255,255,0.25);
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .btn-round:hover  { transform: translateY(-2px); box-shadow: 0 9px 18px rgba(0,0,0,0.6), inset 0 3px 8px rgba(255,255,255,0.25); }
+        .btn-round:active { transform: translateY(2px);  box-shadow: 0 2px 5px rgba(0,0,0,0.6), inset 0 4px 12px rgba(0,0,0,0.35); }
+        /* Start (grün, IEC-„I") */
+        .btn-start {
+            background: radial-gradient(circle at 35% 30%, #57e06f, #1e9e3e 68%, #14702c);
+            border: 4px solid #0e5a22;
+        }
+        /* Not-Aus (rot mit gelbem Ring) */
+        .btn-estop {
+            background: radial-gradient(circle at 35% 30%, #ff6b6b, #d40000 65%, #9c0000);
+            border: 6px solid #f1c40f;
+            font-size: 22px;
+            letter-spacing: 1px;
+        }
+
+        /* Laserstrahlung-Warnung: blinkt zur Aufmerksamkeit */
+        @keyframes laserPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        #laserWarning { animation: laserPulse 1.1s ease-in-out infinite; }
         /* CSS für das Einklappen */
         .sidebar-collapsed {
             width: 0px !important;
@@ -293,10 +332,21 @@
             <!-- Maschinen-Maxpower (für Prozent→S-Wert-Umrechnung). Wird ggf. aus $30 aktualisiert.
                  Kein sichtbares Feld mehr – Jobs nutzen die Speed/Power-Werte pro Ebene. -->
             <input type="number" id="powerInput" value="1000" max="1000" style="display:none;">
-            <button class="btn-success" onclick="generateAndStream()" data-i18n="job.run">▶ Job Lasern</button>
-            <div style="display: flex; gap: 5px; margin-top: 5px; align-items: stretch;">
-                <button class="btn-danger" onclick="abortJob()" data-i18n="job.stop" style="width: 75%; font-weight: bold; font-size: 16px; margin-top: 0; padding: 10px 0;">⏹ STOP / ABBRUCH</button>
-                <button onclick="sendUnlock()" data-i18n="job.unlock" data-i18n-title="job.unlockTip" style="background: #e67e22; width: 25%; font-size: 14px; padding: 10px 0;" title="Alarm entsperren (Unlock $X)">Unlock</button>
+            <!-- Runde Industrie-Taster: links Start (I) + Unlock, rechts Not-Aus -->
+            <div style="display: flex; gap: 16px; justify-content: center; align-items: center; margin: 10px 0 6px;">
+                <!-- Linke Spalte: Start-Taster + Unlock (gleiche Breite) -->
+                <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+                    <button class="btn-round btn-start" onclick="generateAndStream()" data-i18n-title="job.run" title="Job Lasern"
+                            style="width: 80px; height: 80px;">
+                        <span style="font-size: 24px; line-height: 1;">I</span>
+                        <span style="font-size: 10px; margin-top: 2px;" data-i18n="job.runShort">Job Lasern</span>
+                    </button>
+                    <button onclick="sendUnlock()" data-i18n="job.unlock" data-i18n-title="job.unlockTip" title="Alarm entsperren (Unlock $X)"
+                            style="width: 80px; height: 30px; background: #e67e22; font-size: 12px; padding: 0; margin: 0; box-sizing: border-box;">Unlock</button>
+                </div>
+                <!-- Not-Aus: Durchmesser = Höhe (Start 80 + Abstand 6 + Unlock 30) -->
+                <button class="btn-round btn-estop" onclick="abortJob()" data-i18n-title="job.stop" title="STOP / Abbruch"
+                        style="width: 116px; height: 116px;">STOP</button>
             </div>
         </div>
 
@@ -326,6 +376,11 @@
     <div class="workspace-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <h3 style="margin: 0;" data-i18n="ws.title">Arbeitsbereich</h3>
+            <!-- Laserstrahlung-Warnung (nur während eines laufenden Jobs sichtbar) -->
+            <span id="laserWarning" style="display:none; align-items:center; gap:8px; background:#1a1a1a; border:2px solid #f1c40f; color:#f1c40f; font-weight:bold; padding:4px 14px; border-radius:6px; font-size:14px; box-shadow:0 0 12px rgba(241,196,15,0.5);">
+                <span style="font-size:20px;">⚠️</span>
+                <span data-i18n="ws.laserWarning">LASERSTRAHLUNG – nicht in den Strahl blicken</span>
+            </span>
             <div class="row" style="margin: 0; width: auto; gap: 8px; align-items: center;">
                 <select id="langSelect" onchange="setLanguage(this.value)" title="Sprache / Language"
                         style="width: auto; margin: 0; padding: 4px 6px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 13px;">
@@ -3912,13 +3967,13 @@
         // ================================================================
         const I18N = {
             de: {
-                'ws.title':'Arbeitsbereich', 'ws.fitAll':'Alle Objekte zentrieren', 'ws.fitWs':'Arbeitsbereich zentrieren',
+                'ws.title':'Arbeitsbereich', 'ws.laserWarning':'LASERSTRAHLUNG – nicht in den Strahl blicken', 'ws.fitAll':'Alle Objekte zentrieren', 'ws.fitWs':'Arbeitsbereich zentrieren',
                 'ws.zoom100':'100% Ansicht', 'ws.moveLaser':'Laser hierhin fahren', 'ws.setOrigin':'Nullpunkt hier setzen',
                 'panel.machine':'⚙️ Maschine', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 WLAN',
                 'machine.connect':'🔌 Verbinden', 'machine.disconnect':'🛑 Trennen', 'machine.data':'📡 Daten',
                 'machine.dataTip':'Maschinendaten lesen ($$)', 'machine.workarea':'📐 Arbeitsbereich',
                 'machine.width':'Breite (X mm)', 'machine.height':'Höhe (Y mm)', 'machine.applySize':'Größe anwenden',
-                'panel.job':'🎛️ Job Kontrolle', 'job.run':'▶ Job Lasern', 'job.stop':'⏹ STOP / ABBRUCH',
+                'panel.job':'🎛️ Job Kontrolle', 'job.run':'▶ Job Lasern', 'job.runShort':'Job Lasern', 'job.stop':'⏹ STOP / ABBRUCH',
                 'job.unlock':'Unlock', 'job.unlockTip':'Alarm entsperren (Unlock $X)',
                 'panel.control':'🕹️ Steuerung & Konsole', 'ctrl.send':'Befehl senden', 'ctrl.home':'Home',
                 'ctrl.homeTip':'Referenzfahrt (Home $H)', 'ctrl.zeroTip':'Aktuelle Position als X0/Y0 festlegen',
@@ -3944,13 +3999,13 @@
                 'param.modeFillLine':'Fläche + Umriss', 'param.interval':'Linienabstand (mm)'
             },
             en: {
-                'ws.title':'Workspace', 'ws.fitAll':'Fit all objects', 'ws.fitWs':'Center workspace',
+                'ws.title':'Workspace', 'ws.laserWarning':'LASER RADIATION – do not look into the beam', 'ws.fitAll':'Fit all objects', 'ws.fitWs':'Center workspace',
                 'ws.zoom100':'100% view', 'ws.moveLaser':'Move laser here', 'ws.setOrigin':'Set origin here',
                 'panel.machine':'⚙️ Machine', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 Wi-Fi',
                 'machine.connect':'🔌 Connect', 'machine.disconnect':'🛑 Disconnect', 'machine.data':'📡 Data',
                 'machine.dataTip':'Read machine data ($$)', 'machine.workarea':'📐 Work area',
                 'machine.width':'Width (X mm)', 'machine.height':'Height (Y mm)', 'machine.applySize':'Apply size',
-                'panel.job':'🎛️ Job Control', 'job.run':'▶ Run Job', 'job.stop':'⏹ STOP / ABORT',
+                'panel.job':'🎛️ Job Control', 'job.run':'▶ Run Job', 'job.runShort':'Run Job', 'job.stop':'⏹ STOP / ABORT',
                 'job.unlock':'Unlock', 'job.unlockTip':'Clear alarm (Unlock $X)',
                 'panel.control':'🕹️ Control & Console', 'ctrl.send':'Send command', 'ctrl.home':'Home',
                 'ctrl.homeTip':'Homing cycle (Home $H)', 'ctrl.zeroTip':'Set current position as X0/Y0',
@@ -3976,13 +4031,13 @@
                 'param.modeFillLine':'Fill + outline', 'param.interval':'Line spacing (mm)'
             },
             es: {
-                'ws.title':'Área de trabajo', 'ws.fitAll':'Centrar todos los objetos', 'ws.fitWs':'Centrar área de trabajo',
+                'ws.title':'Área de trabajo', 'ws.laserWarning':'RADIACIÓN LÁSER – no mire al haz', 'ws.fitAll':'Centrar todos los objetos', 'ws.fitWs':'Centrar área de trabajo',
                 'ws.zoom100':'Vista 100%', 'ws.moveLaser':'Mover láser aquí', 'ws.setOrigin':'Fijar origen aquí',
                 'panel.machine':'⚙️ Máquina', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 Wi-Fi',
                 'machine.connect':'🔌 Conectar', 'machine.disconnect':'🛑 Desconectar', 'machine.data':'📡 Datos',
                 'machine.dataTip':'Leer datos de la máquina ($$)', 'machine.workarea':'📐 Área de trabajo',
                 'machine.width':'Ancho (X mm)', 'machine.height':'Alto (Y mm)', 'machine.applySize':'Aplicar tamaño',
-                'panel.job':'🎛️ Control de trabajo', 'job.run':'▶ Ejecutar', 'job.stop':'⏹ PARAR / ABORTAR',
+                'panel.job':'🎛️ Control de trabajo', 'job.run':'▶ Ejecutar', 'job.runShort':'Ejecutar', 'job.stop':'⏹ PARAR / ABORTAR',
                 'job.unlock':'Desbloquear', 'job.unlockTip':'Quitar alarma (Unlock $X)',
                 'panel.control':'🕹️ Control y consola', 'ctrl.send':'Enviar comando', 'ctrl.home':'Inicio',
                 'ctrl.homeTip':'Ciclo de origen (Home $H)', 'ctrl.zeroTip':'Fijar posición actual como X0/Y0',
@@ -4008,13 +4063,13 @@
                 'param.modeFillLine':'Relleno + contorno', 'param.interval':'Espaciado de línea (mm)'
             },
             zh: {
-                'ws.title':'工作区', 'ws.fitAll':'居中所有对象', 'ws.fitWs':'居中工作区',
+                'ws.title':'工作区', 'ws.laserWarning':'激光辐射 – 请勿直视光束', 'ws.fitAll':'居中所有对象', 'ws.fitWs':'居中工作区',
                 'ws.zoom100':'100% 视图', 'ws.moveLaser':'移动激光到此', 'ws.setOrigin':'在此设置原点',
                 'panel.machine':'⚙️ 机器', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 Wi-Fi',
                 'machine.connect':'🔌 连接', 'machine.disconnect':'🛑 断开', 'machine.data':'📡 数据',
                 'machine.dataTip':'读取机器数据 ($$)', 'machine.workarea':'📐 工作区域',
                 'machine.width':'宽度 (X mm)', 'machine.height':'高度 (Y mm)', 'machine.applySize':'应用尺寸',
-                'panel.job':'🎛️ 任务控制', 'job.run':'▶ 运行任务', 'job.stop':'⏹ 停止 / 中止',
+                'panel.job':'🎛️ 任务控制', 'job.run':'▶ 运行任务', 'job.runShort':'运行', 'job.stop':'⏹ 停止 / 中止',
                 'job.unlock':'解锁', 'job.unlockTip':'清除报警 (Unlock $X)',
                 'panel.control':'🕹️ 控制与控制台', 'ctrl.send':'发送命令', 'ctrl.home':'回零',
                 'ctrl.homeTip':'回零循环 (Home $H)', 'ctrl.zeroTip':'将当前位置设为 X0/Y0',
@@ -4247,6 +4302,16 @@
             applyTranslations();
         }
         window.addEventListener('load', applyTranslations);
+
+        // Laserstrahlung-Warnung ein-/ausblenden (während eines laufenden Jobs)
+        function showLaserWarning() {
+            let el = document.getElementById('laserWarning');
+            if (el) el.style.display = 'inline-flex';
+        }
+        function hideLaserWarning() {
+            let el = document.getElementById('laserWarning');
+            if (el) el.style.display = 'none';
+        }
 
         // ================================================================
         // EIN-/AUSKLAPPBARE PANELS
@@ -5033,6 +5098,7 @@
                 document.getElementById('posState').innerText = "Disconnected";
                 document.getElementById('posState').style.color = "red";
                 setMachineConnectionState(false); // Status auf Rot setzen
+                hideLaserWarning();               // Warnung nicht hängen lassen
             };
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -5092,6 +5158,7 @@
                 } else if (data.type === 'job_done') {
                     document.getElementById('progressBar').style.width = '100%';
                     document.getElementById('progressText').innerText = '100%';
+                    hideLaserWarning();     // Laserstrahlung-Warnung ausblenden
                     logMessage("SYSTEM", "Job abgeschlossen. Pumpe läuft noch 10 Sekunden nach.", "#28a745");
                     // Nach einem Test-Lauf: Bewertungsdialog öffnen
                     if (_matTest && _matTest.active && _matTest.lastJobWasTest) {
@@ -5194,6 +5261,7 @@
                 ws.send(JSON.stringify({ action: "abort_job" }));
                 logMessage("USER", "ABBRUCH ANGEFORDERT!", "red");
                 schedulePumpOff(10);    // Pumpe läuft noch 10 s nach
+                hideLaserWarning();     // Laserstrahlung-Warnung ausblenden
             } else {
                 alert("Keine Verbindung zum Agenten!");
             }
@@ -5327,6 +5395,9 @@
                 originY: oY
                 // Hinweis: Globale Feedrate/Power senden wir nicht mehr, da jedes Objekt seine eigenen hat!
             }));
+
+            // Job enthält Laser-Operationen → Laserstrahlung-Warnung einblenden
+            showLaserWarning();
         }
 
         // --- PANEL TOGGLE LOGIK ---
