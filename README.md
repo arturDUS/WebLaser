@@ -17,7 +17,7 @@
 <a id="-deutsch"></a>
 ## 🇩🇪 Deutsch
 
-> Browser-Oberfläche zum Zeichnen, Bearbeiten und Lasern — gehostet auf einem Mini-PC (z. B. Raspberry Pi) direkt am Lasercutter oder lokal auf Windows/Linux.
+> WebLaser bietet eine intuitive, browserbasierte Oberfläche zum Zeichnen, Bearbeiten und Lasern. Die Software passt sich exakt dem jeweiligen Setup an: Sie kann entweder direkt als lokale Webanwendung auf einem Windows- oder Linux-PC gestartet werden, oder sie läuft direkt auf einem in den Lasercutter integrierten Mini-PC (wie einem Raspberry Pi), auf den bequem per Netzwerk über den Browser zugegriffen wird.
 
 📖 **[➜ Vollständiges Handbuch](docs/de/HANDBUCH.md)**
 
@@ -53,17 +53,17 @@ Danach im Browser öffnen: **http://localhost:8080**
 ```
 ┌────────────────────────┐        WebSocket :8765        ┌────────────────────────┐
 │   Browser (index.html) │  ◄──────── Status ──────────  │   agent.py (Python)    │
-│   Fabric.js Oberfläche  │  ────────  Befehle ────────►  │                        │
+│   Fabric.js Oberfläche │  ────────  Befehle ────────►  │                        │
 │   - Zeichnen           │                               │  - WebSocket-Server    │
-│   - G-Code-Erzeugung    │        HTTP :8080             │  - HTTP-Server (UI)    │
-│     (Foto/Raster)       │  ◄──── index.html ────────    │  - G-Code-Generierung  │
+│   - G-Code-Erzeugung   │        HTTP :8080             │  - HTTP-Server (UI)    │
+│     (Foto/Raster)      │  ◄──── index.html ────────    │  - G-Code-Generierung  │
 └────────────────────────┘                               │  - materials.json      │
-                                                          └───────────┬────────────┘
-                                                        USB/COM oder  │  WLAN (HTTP+WS)
-                                                                      ▼
-                                                          ┌────────────────────────┐
-                                                          │   GRBL-Lasercutter     │
-                                                          └────────────────────────┘
+                                                         └───────────┬────────────┘
+                                                       USB/COM oder  │  WLAN (HTTP+WS)
+                                                                     ▼
+                                                         ┌────────────────────────┐
+                                                         │   GRBL-Lasercutter     │
+                                                         └────────────────────────┘
 ```
 
 Details: siehe **[Handbuch](docs/de/HANDBUCH.md)**.
@@ -99,7 +99,7 @@ MIT — siehe [Lizenz / License](#-lizenz--license) am Ende.
 <a id="-english"></a>
 ## 🇬🇧 English
 
-> Web-based laser cutter control — draw, edit and laser from your browser, hosted on a small PC (e.g. Raspberry Pi) right at the machine, or locally on Windows/Linux.
+> WebLaser offers an intuitive, browser-based interface for drawing, editing, and laser cutting. The software perfectly adapts to your specific setup: It can either be launched directly as a local web application on a Windows or Linux PC, or it can run directly on a mini-PC (such as a Raspberry Pi) integrated into the laser cutter, allowing for convenient network access via your web browser.
 
 📖 **[➜ Full Manual](docs/en/MANUAL.md)**
 
@@ -135,17 +135,17 @@ Then open in your browser: **http://localhost:8080**
 ```
 ┌────────────────────────┐        WebSocket :8765        ┌────────────────────────┐
 │   Browser (index.html) │  ◄──────── Status ──────────  │   agent.py (Python)    │
-│   Fabric.js interface   │  ────────  Commands ───────►  │                        │
+│   Fabric.js interface  │  ────────  Commands ───────►  │                        │
 │   - Drawing            │                               │  - WebSocket server    │
-│   - G-code generation   │        HTTP :8080             │  - HTTP server (UI)    │
-│     (photo/raster)      │  ◄──── index.html ────────    │  - G-code generation   │
+│   - G-code generation  │        HTTP :8080             │  - HTTP server (UI)    │
+│     (photo/raster)     │  ◄──── index.html ────────    │  - G-code generation   │
 └────────────────────────┘                               │  - materials.json      │
-                                                          └───────────┬────────────┘
-                                                        USB/COM  or   │  Wi-Fi (HTTP+WS)
-                                                                      ▼
-                                                          ┌────────────────────────┐
-                                                          │   GRBL laser cutter    │
-                                                          └────────────────────────┘
+                                                         └───────────┬────────────┘
+                                                       USB/COM  or   │  Wi-Fi (HTTP+WS)
+                                                                     ▼
+                                                         ┌────────────────────────┐
+                                                         │   GRBL laser cutter    │
+                                                         └────────────────────────┘
 ```
 
 Details: see the **[Manual](docs/en/MANUAL.md)**.
