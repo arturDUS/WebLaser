@@ -7,6 +7,7 @@ import re
 import serial
 import serial.tools.list_ports
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -60,13 +61,16 @@ total_job_lines = 0
 completed_job_lines = 0
 last_progress_percent = -1
 active_connections = 0
+current_transport = "USB"      # "USB" | "Telnet" | "ESP3D-WebUI" – aktive Verbindungsart
+firmware_detected = None       # z. B. "FluidNC v3.7" / "Grbl 1.1f" (per $I/Banner erkannt)
 
 class NetworkLaser:
-    """ 
-    Hybrid-Kommunikation für ESP3D/Makerbase Controller:
+    """
+    Hybrid-Kommunikation für ESP3D/Makerbase Controller (z. B. Grbl_ESP32):
     - Hört über WebSockets (Port 8849) zu (Zuhören/Status).
     - Spricht über HTTP GET Requests (Port 8848) (Befehle).
     """
+    IS_NETWORK = True
     def __init__(self, ip, ws_port=8849, http_port=8848, timeout=0.1):
         self.ip = ip
         self.http_port = http_port
@@ -160,6 +164,176 @@ class NetworkLaser:
             print("DEBUG: Netzwerkverbindung getrennt.")
         except:
             pass
+
+
+class TelnetLaser:
+    """
+    Roher TCP/Telnet-Stream zu FluidNC (Standard-Port 23).
+    Verhält sich wie eine serielle Schnittstelle: G-Code-Zeilen + '\\n' senden,
+    '?' / 0x18 als Realtime-Bytes, Antworten zeilenweise lesen.
+    """
+    IS_NETWORK = True
+    def __init__(self, ip, port=23, timeout=0.1):
+        self.ip = ip
+        self.port = port
+        self.sock = socket.create_connection((ip, port), timeout=3.0)
+        try:
+            self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # kleine Befehle sofort senden
+        except Exception:
+            pass
+        self.sock.settimeout(timeout)
+        self._buf = b""      # bereinigte Textbytes (für Zeilen)
+        self._raw = b""      # noch nicht IAC-verarbeitete Rohbytes
+        self.is_open = True
+        print(f"DEBUG: FluidNC-Telnet verbunden mit {ip}:{port}")
+
+    def _process_iac(self):
+        """Telnet-IAC-Aushandlung verarbeiten: Optionen höflich ablehnen, Steuerbytes entfernen."""
+        IAC, DONT, DO, WONT, WILL, SB, SE = 255, 254, 253, 252, 251, 250, 240
+        raw = self._raw
+        n = len(raw)
+        i = 0
+        clean = bytearray()
+        resp = bytearray()
+        while i < n:
+            b = raw[i]
+            if b != IAC:
+                clean.append(b); i += 1; continue
+            if i + 1 >= n:
+                break                                   # unvollständige IAC am Ende
+            c = raw[i + 1]
+            if c == IAC:
+                clean.append(IAC); i += 2; continue     # escaped 0xFF = literal
+            if c in (DO, DONT, WILL, WONT):
+                if i + 2 >= n:
+                    break
+                opt = raw[i + 2]
+                if c == DO:     resp += bytes([IAC, WONT, opt])   # jede Option ablehnen
+                elif c == WILL: resp += bytes([IAC, DONT, opt])
+                i += 3; continue
+            if c == SB:
+                j = i + 2                               # Subnegotiation bis IAC SE überspringen
+                while j + 1 < n and not (raw[j] == IAC and raw[j + 1] == SE):
+                    j += 1
+                if j + 1 >= n:
+                    break
+                i = j + 2; continue
+            i += 2; continue                            # sonstige 2-Byte-Kommandos
+        self._raw = raw[i:]                             # Rest (inkl. unvollständiger IAC) behalten
+        if resp:
+            try:
+                self.sock.sendall(bytes(resp))
+                print(f"DEBUG TELNET IAC-Antwort gesendet ({len(resp)} Bytes)")
+            except Exception:
+                pass
+        self._buf += bytes(clean)
+
+    def write(self, data):
+        if not self.is_open:
+            return
+        try:
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            self.sock.sendall(data)   # Bytes exakt wie übergeben (Realtime '?'/0x18 ohne Newline)
+        except Exception as e:
+            print("Telnet Sende-Fehler:", e)
+            self.is_open = False
+
+    @property
+    def in_waiting(self):
+        return 1 if self.is_open else 0
+
+    def _pop_line(self):
+        """Extrahiert eine Zeile aus dem Puffer; akzeptiert \\n, \\r ODER \\r\\n als Ende."""
+        idx = -1
+        for k, ch in enumerate(self._buf):
+            if ch == 0x0A or ch == 0x0D:   # \n oder \r
+                idx = k
+                break
+        if idx == -1:
+            return None
+        line = self._buf[:idx]
+        # \r\n als Paar gemeinsam konsumieren
+        if self._buf[idx:idx+2] == b"\r\n":
+            self._buf = self._buf[idx+2:]
+        else:
+            self._buf = self._buf[idx+1:]
+        return line + b"\n"
+
+    def readline(self):
+        """Liefert genau eine vollständige Zeile (mit '\\n') oder b'' bei Timeout."""
+        if not self.is_open:
+            return b""
+        line = self._pop_line()
+        if line is not None:
+            return line
+        try:
+            chunk = self.sock.recv(2048)
+            if chunk == b"":
+                self.is_open = False     # Gegenseite hat geschlossen
+                return b""
+            self._raw += chunk
+            self._process_iac()          # IAC-Steuerbytes verarbeiten/entfernen
+        except socket.timeout:
+            return b""
+        except Exception as e:
+            if "timed out" in str(e).lower():
+                return b""
+            print("Telnet Lese-Fehler:", e)
+            self.is_open = False
+            return b""
+        line = self._pop_line()
+        return line if line is not None else b""
+
+    def close(self):
+        self.is_open = False
+        try:
+            self.sock.close()
+            print("DEBUG: Telnet-Verbindung getrennt.")
+        except:
+            pass
+
+
+def connect_network_laser(ip, mode, ws_port, http_port):
+    """
+    Stellt eine Netzwerkverbindung her und erkennt den Transport automatisch.
+    mode: 'auto' | 'telnet' | 'webui'.  Liefert (laser, transport_name).
+    """
+    # FluidNC-Telnet (Port 23) zuerst probieren (bei 'auto' und 'telnet')
+    if mode in ('auto', 'telnet'):
+        try:
+            laser = TelnetLaser(ip, 23)
+            return laser, "Telnet"
+        except Exception as e:
+            print(f"DEBUG: Telnet (Port 23) nicht erreichbar: {e}")
+            if mode == 'telnet':
+                raise   # explizit gewünscht → Fehler durchreichen
+    # Fallback / explizit: ESP3D-WebUI (Grbl_ESP32)
+    laser = NetworkLaser(ip, ws_port, http_port)
+    return laser, "ESP3D-WebUI"
+
+
+def _detect_firmware(line_str, loop):
+    """Erkennt FluidNC vs. Grbl aus Banner-/$I-Zeilen und meldet es einmalig ans Frontend."""
+    global firmware_detected
+    if firmware_detected:
+        return
+    name = None
+    if 'FluidNC' in line_str:
+        m = re.search(r'FluidNC\s+v?([0-9][0-9.]*)', line_str)
+        name = "FluidNC" + (f" v{m.group(1)}" if m else "")
+    elif line_str.startswith('Grbl') or line_str.startswith('[VER:'):
+        m = re.search(r'Grbl\s+v?([0-9][0-9.]*[a-z]?)', line_str)
+        if not m:
+            m = re.search(r'\[VER:([0-9][0-9.]*[a-z]?)', line_str)
+        name = "Grbl" + (f" {m.group(1)}" if m else "")
+    if name:
+        firmware_detected = name
+        print(f"DEBUG: Firmware erkannt: {name} über {current_transport}")
+        if connected_websocket:
+            asyncio.run_coroutine_threadsafe(
+                connected_websocket.send(json.dumps({
+                    "type": "firmware", "name": name, "transport": current_transport})), loop)
 
 
 def get_base_path():
@@ -387,6 +561,7 @@ def serial_worker(loop):
                 if line:
                     line_str = line.decode('utf-8', errors='ignore').strip()
                     if line_str:
+                        _detect_firmware(line_str, loop)   # FluidNC/Grbl aus Banner/$I erkennen
                         # Status-Polls (<...>)
                         if line_str.startswith('<'):
                             match = STATUS_RE.search(line_str)
@@ -447,7 +622,7 @@ def serial_worker(loop):
                     last_poll_time = current_time
 
                 # 3. Queue abarbeiten
-                is_net = isinstance(laser_serial, NetworkLaser)
+                is_net = getattr(laser_serial, 'IS_NETWORK', False)   # NetworkLaser ODER TelnetLaser
                 # Netzwerk: nur senden wenn GRBL das letzte 'ok' geschickt hat
                 # (oder ein Timeout von 3 s überschritten wurde als Fallback)
                 ok_to_send = (not is_net) or (not net_waiting_ok) or (time.time() > net_ok_timeout)
@@ -485,23 +660,28 @@ async def handle_client(websocket, path=None):
             if action == "connect":
                 try:
                     conn_type = data.get("connType", "usb")
-                    
+                    global current_transport, firmware_detected
+                    firmware_detected = None   # bei jeder neuen Verbindung zurücksetzen
+
                     if conn_type == "net":
-                        # NUTZT NUR die neue Netzwerk-Klasse
                         ip = data.get("ip")
-                        port = int(data.get("netPort", 8849))
-                        laser_serial = NetworkLaser(ip, port)
+                        net_mode = data.get("netMode", "auto")        # auto | telnet | webui
+                        ws_port = int(data.get("netPort", 8849))      # ESP3D-WebUI-Port (Fallback)
+                        # Transport automatisch erkennen (FluidNC-Telnet 23 zuerst)
+                        laser_serial, current_transport = connect_network_laser(ip, net_mode, ws_port, 8848)
                     else:
-                        # NUTZT DEINE USB-KLASSE (Keine NetworkLaser-Klasse!)
+                        # USB / serielle Verbindung
+                        current_transport = "USB"
                         com_port = data.get("port")
                         baud = int(data.get("baudrate", 115200))
-                        # WICHTIG: Hier initialisieren wir direkt serial.Serial, 
-                        # nicht NetworkLaser!
                         laser_serial = serial.Serial(com_port, baud, timeout=0.1)
-                        
+
                     stop_thread = False
                     threading.Thread(target=serial_worker, args=(loop,), daemon=True).start()
                     await websocket.send(json.dumps({"type": "info", "msg": f"Verbunden ({conn_type})"}))
+                    # Transport sofort melden; $I löst die Firmware-Erkennung aus
+                    await websocket.send(json.dumps({"type": "conn_info", "transport": current_transport, "connType": conn_type}))
+                    job_queue.append('$I')
                 except Exception as e:
                     await websocket.send(json.dumps({"type": "error", "msg": str(e)}))
             

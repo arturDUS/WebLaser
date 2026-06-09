@@ -298,9 +298,16 @@
                 <input type="number" id="baudInput" value="115200" style="width: 40%;">
             </div>
 
-            <div id="netConfig" class="row" style="display: none;">
-                <input type="text" id="ipInput" value="192.168.178.32" placeholder="IP Adresse" style="width: 70%;">
-                <input type="number" id="netPortInput" value="8849" style="width: 30%;">
+            <div id="netConfig" style="display: none;">
+                <div class="row">
+                    <input type="text" id="ipInput" value="192.168.178.32" placeholder="IP Adresse" style="width: 70%;">
+                    <input type="number" id="netPortInput" value="8849" style="width: 30%;" title="ESP3D-WebUI WS-Port (nur für ESP3D-WebUI-Modus)">
+                </div>
+                <select id="netMode" title="Verbindungsart" style="width:100%; margin-top:5px; background:#333; color:#fff; border:1px solid #555; border-radius:4px; padding:4px; font-size:12px;">
+                    <option value="auto" data-i18n="machine.netAuto">Auto-Erkennung (FluidNC / Grbl)</option>
+                    <option value="telnet" data-i18n="machine.netTelnet">FluidNC (Telnet 23)</option>
+                    <option value="webui" data-i18n="machine.netWebui">ESP3D-WebUI (Grbl_ESP32)</option>
+                </select>
             </div>
             
             <div style="display: flex; gap: 5px; margin-top: 5px;">
@@ -341,12 +348,12 @@
                         <span style="font-size: 24px; line-height: 1;">I</span>
                         <span style="font-size: 10px; margin-top: 2px;" data-i18n="job.runShort">Job Lasern</span>
                     </button>
-                    <button onclick="sendUnlock()" data-i18n="job.unlock" data-i18n-title="job.unlockTip" title="Alarm entsperren (Unlock $X)"
-                            style="width: 80px; height: 30px; background: #e67e22; font-size: 12px; padding: 0; margin: 0; box-sizing: border-box;">Unlock</button>
+                    <button class="btn-round" onclick="sendUnlock()" data-i18n-title="job.unlockTip" title="Alarm entsperren (Unlock $X)"
+                            style="width: 42px; height: 42px; background: radial-gradient(circle at 35% 30%, #f0a050, #e67e22 70%, #c0651a); border: 3px solid #a85d18; font-size: 18px;">🔑</button>
                 </div>
-                <!-- Not-Aus: Durchmesser = Höhe (Start 80 + Abstand 6 + Unlock 30) -->
+                <!-- Not-Aus: Durchmesser = Höhe (Start 80 + Abstand 6 + Unlock 42) -->
                 <button class="btn-round btn-estop" onclick="abortJob()" data-i18n-title="job.stop" title="STOP / Abbruch"
-                        style="width: 116px; height: 116px;">STOP</button>
+                        style="width: 128px; height: 128px;">STOP</button>
             </div>
         </div>
 
@@ -1130,6 +1137,7 @@
 
         let isPumpOn = false;
         let _pumpOffTimer = null;   // Nachlauf-Timer nach Job-Ende oder Abbruch
+        let _connTransport = '';    // aktiver Verbindungs-Transport (Telnet / ESP3D-WebUI / USB)
 
         function setPumpState(on) {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -3970,6 +3978,7 @@
                 'ws.title':'Arbeitsbereich', 'ws.laserWarning':'LASERSTRAHLUNG – nicht in den Strahl blicken', 'ws.fitAll':'Alle Objekte zentrieren', 'ws.fitWs':'Arbeitsbereich zentrieren',
                 'ws.zoom100':'100% Ansicht', 'ws.moveLaser':'Laser hierhin fahren', 'ws.setOrigin':'Nullpunkt hier setzen',
                 'panel.machine':'⚙️ Maschine', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 WLAN',
+                'machine.netAuto':'Auto-Erkennung (FluidNC / Grbl)', 'machine.netTelnet':'FluidNC (Telnet 23)', 'machine.netWebui':'ESP3D-WebUI (Grbl_ESP32)',
                 'machine.connect':'🔌 Verbinden', 'machine.disconnect':'🛑 Trennen', 'machine.data':'📡 Daten',
                 'machine.dataTip':'Maschinendaten lesen ($$)', 'machine.workarea':'📐 Arbeitsbereich',
                 'machine.width':'Breite (X mm)', 'machine.height':'Höhe (Y mm)', 'machine.applySize':'Größe anwenden',
@@ -4002,6 +4011,7 @@
                 'ws.title':'Workspace', 'ws.laserWarning':'LASER RADIATION – do not look into the beam', 'ws.fitAll':'Fit all objects', 'ws.fitWs':'Center workspace',
                 'ws.zoom100':'100% view', 'ws.moveLaser':'Move laser here', 'ws.setOrigin':'Set origin here',
                 'panel.machine':'⚙️ Machine', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 Wi-Fi',
+                'machine.netAuto':'Auto-detect (FluidNC / Grbl)', 'machine.netTelnet':'FluidNC (Telnet 23)', 'machine.netWebui':'ESP3D-WebUI (Grbl_ESP32)',
                 'machine.connect':'🔌 Connect', 'machine.disconnect':'🛑 Disconnect', 'machine.data':'📡 Data',
                 'machine.dataTip':'Read machine data ($$)', 'machine.workarea':'📐 Work area',
                 'machine.width':'Width (X mm)', 'machine.height':'Height (Y mm)', 'machine.applySize':'Apply size',
@@ -4034,6 +4044,7 @@
                 'ws.title':'Área de trabajo', 'ws.laserWarning':'RADIACIÓN LÁSER – no mire al haz', 'ws.fitAll':'Centrar todos los objetos', 'ws.fitWs':'Centrar área de trabajo',
                 'ws.zoom100':'Vista 100%', 'ws.moveLaser':'Mover láser aquí', 'ws.setOrigin':'Fijar origen aquí',
                 'panel.machine':'⚙️ Máquina', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 Wi-Fi',
+                'machine.netAuto':'Detección automática (FluidNC / Grbl)', 'machine.netTelnet':'FluidNC (Telnet 23)', 'machine.netWebui':'ESP3D-WebUI (Grbl_ESP32)',
                 'machine.connect':'🔌 Conectar', 'machine.disconnect':'🛑 Desconectar', 'machine.data':'📡 Datos',
                 'machine.dataTip':'Leer datos de la máquina ($$)', 'machine.workarea':'📐 Área de trabajo',
                 'machine.width':'Ancho (X mm)', 'machine.height':'Alto (Y mm)', 'machine.applySize':'Aplicar tamaño',
@@ -4066,6 +4077,7 @@
                 'ws.title':'工作区', 'ws.laserWarning':'激光辐射 – 请勿直视光束', 'ws.fitAll':'居中所有对象', 'ws.fitWs':'居中工作区',
                 'ws.zoom100':'100% 视图', 'ws.moveLaser':'移动激光到此', 'ws.setOrigin':'在此设置原点',
                 'panel.machine':'⚙️ 机器', 'machine.usb':'🔌 USB (COM)', 'machine.wlan':'📡 Wi-Fi',
+                'machine.netAuto':'自动识别 (FluidNC / Grbl)', 'machine.netTelnet':'FluidNC (Telnet 23)', 'machine.netWebui':'ESP3D-WebUI (Grbl_ESP32)',
                 'machine.connect':'🔌 连接', 'machine.disconnect':'🛑 断开', 'machine.data':'📡 数据',
                 'machine.dataTip':'读取机器数据 ($$)', 'machine.workarea':'📐 工作区域',
                 'machine.width':'宽度 (X mm)', 'machine.height':'高度 (Y mm)', 'machine.applySize':'应用尺寸',
@@ -5087,7 +5099,9 @@
         }
 
         function connectAgent() {
-            ws = new WebSocket('ws://localhost:8765');
+            // WebSocket zum Host, der die Seite ausgeliefert hat (localhost lokal, Pi-IP im Netzwerk)
+            let wsHost = window.location.hostname || 'localhost';
+            ws = new WebSocket('ws://' + wsHost + ':8765');
             ws.onopen = () => {
                 logMessage("SYSTEM", "Agent verbunden.");
                 requestPorts(); // Automatisch nach Ports suchen, wenn die Seite lädt!
@@ -5155,6 +5169,18 @@
                     }
                 } else if (data.type === 'materials_saved') {
                     if (!data.ok) logMessage("SYSTEM", "Fehler beim Speichern der Materialbibliothek!", "red");
+                } else if (data.type === 'conn_info') {
+                    // Transport-Art gemeldet (Firmware folgt per 'firmware')
+                    _connTransport = data.transport || '';
+                    logMessage("SYSTEM", `Transport: ${_connTransport}`, "#3498db");
+                    let icon = document.getElementById('machineStatusIcon');
+                    if (icon) icon.title = "Verbunden über " + _connTransport;
+                } else if (data.type === 'firmware') {
+                    // Firmware erkannt (FluidNC / Grbl)
+                    let txt = `Verbunden: ${data.name} über ${data.transport || _connTransport || ''}`;
+                    logMessage("SYSTEM", txt, "#28a745");
+                    let icon = document.getElementById('machineStatusIcon');
+                    if (icon) icon.title = txt;
                 } else if (data.type === 'job_done') {
                     document.getElementById('progressBar').style.width = '100%';
                     document.getElementById('progressText').innerText = '100%';
@@ -5227,9 +5253,10 @@
             if (connType === 'net') {
                 let ip = document.getElementById('ipInput').value;
                 let port = document.getElementById('netPortInput').value;
+                let netMode = document.getElementById('netMode').value;   // auto | telnet | webui
                 if (!ip) { alert("Bitte eine IP-Adresse eingeben!"); return; }
-                
-                ws.send(JSON.stringify({ action: "connect", connType: "net", ip: ip, netPort: parseInt(port) }));
+
+                ws.send(JSON.stringify({ action: "connect", connType: "net", ip: ip, netPort: parseInt(port), netMode: netMode }));
             } else {
                 ws.send(JSON.stringify({ 
                     action: "connect", 

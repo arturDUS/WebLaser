@@ -56,6 +56,8 @@ Danach im Browser öffnen: **http://localhost:8080**
 
 > Auf einem Raspberry Pi am Lasercutter ist die Oberfläche über die IP des Pi aus dem Netzwerk erreichbar, z. B. `http://192.168.178.50:8080`.
 
+🍓 **Komplette Raspberry-Pi-Einrichtung mit Autostart (1-Zeilen-Installer):** [docs/RASPBERRY_PI.md](docs/RASPBERRY_PI.md)
+
 ### 🧩 Architektur
 
 ```
@@ -145,6 +147,8 @@ python agent.py
 Then open in your browser: **http://localhost:8080**
 
 > On a Raspberry Pi at the machine, the interface is reachable from the network via the Pi's IP, e.g. `http://192.168.178.50:8080`.
+
+🍓 **Full Raspberry Pi setup with autostart (1-line installer):** [docs/RASPBERRY_PI.md](docs/RASPBERRY_PI.md)
 
 ### 🧩 Architecture
 

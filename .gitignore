@@ -26,6 +26,9 @@ path1.svg
 path2.svg
 Zeichnung.svg
 
+# --- Heruntergeladene Tools (nicht Teil des Projekts) ---
+fluidnc-v4.0.3-win64/
+
 # --- Tooling / IDE / OS ---
 .claude/
 .vscode/
