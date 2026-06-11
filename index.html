@@ -360,7 +360,7 @@
         <div class="panel" style="flex-grow: 1; display: flex; flex-direction: column;">
             <h3 data-i18n="panel.control">🕹️ Steuerung & Konsole</h3>
             <div class="row">
-                <input type="text" id="gcodeInput" placeholder="G0 X10 Y10">
+                <input type="text" id="gcodeInput" placeholder="G0 X10 Y10" autocomplete="off" data-i18n-title="ctrl.histHint" title="↑/↓ blättert durch den Befehlsverlauf">
                 <button onclick="sendGcode()" data-i18n-title="ctrl.send" title="Befehl senden" style="width: 50px;">✉️</button>
             </div>
             <div class="row" style="margin-top: 5px;">
@@ -1438,10 +1438,10 @@
                 activePoints.push(snapPoint);
                 let ptIndex = activePoints.length - 1;
 
-                // Handle (rotes Quadrat) erstellen
+                // Handle (kleines, ungefülltes Quadrat) erstellen
                 let handle = new fabric.Rect({
                     left: snapPoint.x, top: snapPoint.y,
-                    width: 10, height: 10, fill: 'blue', stroke: 'white', strokeWidth: 1,
+                    width: 6, height: 6, fill: 'transparent', stroke: '#1565c0', strokeWidth: 1.5,
                     originX: 'center', originY: 'center',
                     hasControls: false, hasBorders: false,
                     selectable: true, hoverCursor: 'move',
@@ -1453,25 +1453,32 @@
 
                 handle.on('moving', function() {
                     let idx = this.pointIndex;
-                    // Aktuelle Handle-Position in chainPoints übernehmen
-                    this.chainPoints[idx] = { x: this.left, y: this.top };
 
-                    // Nur die angeschlossenen Liniensegmente aktualisieren:
-                    // – vorherige Linie: ihr zweiter Endpunkt folgt dem Handle
-                    if (idx > 0) {
-                        updateLineForSVG(
-                            this.chainLines[idx - 1],
-                            this.chainPoints[idx - 1].x, this.chainPoints[idx - 1].y,
-                            this.left, this.top
-                        );
+                    // Magnet-Snapping beim Verschieben des Eckpunkts
+                    // (eigene Kette + bereits verbundene Ketten vom Snap ausschließen,
+                    //  damit ein verschmolzener Punkt nicht auf sich selbst einrastet)
+                    _snapExcludeChainIds = new Set([this.chainId]);
+                    if (this.linkGroup) this.linkGroup.forEach(h => { if (h.chainId) _snapExcludeChainIds.add(h.chainId); });
+                    let snap = getMagnetSnap({ x: this.left, y: this.top });
+                    _snapExcludeChainIds = null;
+                    if (snap) {
+                        this.set({ left: snap.x, top: snap.y });
+                        _showSnap(snap.x, snap.y, snap.type);
+                    } else {
+                        _hideSnap();
                     }
-                    // – nächste Linie: ihr erster Endpunkt folgt dem Handle
-                    if (idx < this.chainLines.length) {
-                        updateLineForSVG(
-                            this.chainLines[idx],
-                            this.left, this.top,
-                            this.chainPoints[idx + 1].x, this.chainPoints[idx + 1].y
-                        );
+
+                    // Aktuelle (ggf. eingerastete) Handle-Position in die Kette übernehmen
+                    _applyHandlePosition(this);
+
+                    // Verbundene (verschmolzene) Handles anderer Linien mitziehen
+                    if (this.linkGroup) {
+                        for (let other of this.linkGroup) {
+                            if (other === this || !canvas.contains(other)) continue;
+                            other.set({ left: this.left, top: this.top });
+                            other.setCoords();
+                            _applyHandlePosition(other);
+                        }
                     }
 
                     if (isPolyMode && previewLine && idx === this.chainPoints.length - 1) {
@@ -2376,6 +2383,29 @@
             return { left: minX, top: minY, width: maxX - minX, height: maxY - minY };
         }
 
+        // Zeichnet eine Bemaßung entlang der Kante p1→p2 (außen versetzt), mit Maßzahl.
+        // center = Objektmittelpunkt (bestimmt die Außenrichtung). dimType = 'X' | 'Y'.
+        function _drawEdgeDim(p1, p2, center, lineEl, tickA, tickB, textEl, valueText, dimType, zoom, strokeW, fontSz) {
+            let dx = p2.x - p1.x, dy = p2.y - p1.y;
+            let len = Math.hypot(dx, dy) || 1;
+            let ux = dx / len, uy = dy / len;     // Kantenrichtung
+            let nx = -uy, ny = ux;                // Normale
+            // Normale nach außen (vom Objektmittelpunkt weg) ausrichten
+            let mx0 = (p1.x + p2.x) / 2, my0 = (p1.y + p2.y) / 2;
+            if ((mx0 - center.x) * nx + (my0 - center.y) * ny < 0) { nx = -nx; ny = -ny; }
+            let offset = 25 / zoom, tickSz = 6 / zoom;
+            let o1 = { x: p1.x + nx * offset, y: p1.y + ny * offset };
+            let o2 = { x: p2.x + nx * offset, y: p2.y + ny * offset };
+            lineEl.set({ x1: o1.x, y1: o1.y, x2: o2.x, y2: o2.y, strokeWidth: strokeW, visible: true });
+            tickA.set({ x1: o1.x - nx * tickSz, y1: o1.y - ny * tickSz, x2: o1.x + nx * tickSz, y2: o1.y + ny * tickSz, strokeWidth: strokeW, visible: true });
+            tickB.set({ x1: o2.x - nx * tickSz, y1: o2.y - ny * tickSz, x2: o2.x + nx * tickSz, y2: o2.y + ny * tickSz, strokeWidth: strokeW, visible: true });
+            let ang = Math.atan2(uy, ux) * 180 / Math.PI;
+            if (ang > 90 || ang < -90) ang += 180;   // Text nicht kopfüber
+            let tx = (o1.x + o2.x) / 2 + nx * (12 / zoom);
+            let ty = (o1.y + o2.y) / 2 + ny * (12 / zoom);
+            textEl.set({ text: valueText, left: tx, top: ty, angle: ang, originX: 'center', originY: 'center', fontSize: fontSz, dimType: dimType, visible: true });
+        }
+
         function updateDimensionLines() {
             if (!dimElements.lineX) initDimensionLines();
             
@@ -2449,38 +2479,44 @@
             }
 
             // ==========================================
-            // RECHTECK / KREIS / SVG / POLYLINIE (ganze Kette)
+            // RECHTECK / KREIS / SVG / BILD / POLYLINIE (ganze Kette)
+            // Maße folgen den tatsächlichen (ggf. rotierten) Objektkanten.
             // ==========================================
-            // Für activeSelection einer Polylinie: Bounds aus chainPoints (ohne Handles)
-            let br, w, h;
-            if (obj.type === 'activeSelection') {
-                let polyObj = obj.getObjects().find(o => o.customType === 'polyLine' && o.chainId);
-                if (polyObj) {
-                    let bounds = getPolylineChainBounds(polyObj.chainId);
-                    if (bounds) { br = bounds; w = bounds.width; h = bounds.height; }
+            let corners, w, h;
+
+            // Polylinien-Kette (activeSelection): achsenparallele Bounds aus chainPoints
+            let polyObj = (obj.type === 'activeSelection')
+                ? obj.getObjects().find(o => o.customType === 'polyLine' && o.chainId) : null;
+            if (polyObj) {
+                let b = getPolylineChainBounds(polyObj.chainId);
+                if (b) {
+                    corners = {
+                        tl: { x: b.left, y: b.top },             tr: { x: b.left + b.width, y: b.top },
+                        br: { x: b.left + b.width, y: b.top + b.height }, bl: { x: b.left, y: b.top + b.height }
+                    };
+                    w = b.width; h = b.height;
                 }
             }
-            if (!br) {
-                br = obj.getBoundingRect(true);
+            // Normalfall: Eckpunkte aus der Transformationsmatrix (inkl. Rotation/Skalierung)
+            if (!corners) {
+                let m = obj.calcTransformMatrix();
+                let w2 = obj.width / 2, h2 = obj.height / 2;
+                let lc = [ {x:-w2,y:-h2}, {x:w2,y:-h2}, {x:w2,y:h2}, {x:-w2,y:h2} ]; // tl,tr,br,bl
+                let abs = lc.map(p => fabric.util.transformPoint(p, m));
+                corners = { tl: abs[0], tr: abs[1], br: abs[2], bl: abs[3] };
                 w = obj.width * obj.scaleX;
                 h = obj.height * obj.scaleY;
             }
 
+            let center = { x: (corners.tl.x + corners.br.x) / 2, y: (corners.tl.y + corners.br.y) / 2 };
 
-            let offset = 25 / zoom;
-            let tickSz = 6 / zoom;
-
-            let yX = br.top + br.height + offset;
-            dimElements.lineX.set({ x1: br.left, y1: yX, x2: br.left + br.width, y2: yX, strokeWidth: strokeW });
-            dimElements.tickXL.set({ x1: br.left, y1: yX - tickSz, x2: br.left, y2: yX + tickSz, strokeWidth: strokeW });
-            dimElements.tickXR.set({ x1: br.left + br.width, y1: yX - tickSz, x2: br.left + br.width, y2: yX + tickSz, strokeWidth: strokeW });
-            dimElements.textX.set({ text: w.toFixed(2) + ' mm', left: br.left + br.width/2, top: yX - (2/zoom), fontSize: fontSz, angle: 0, dimType: 'X' });
-
-            let xY = br.left + br.width + offset;
-            dimElements.lineY.set({ x1: xY, y1: br.top, x2: xY, y2: br.top + br.height, strokeWidth: strokeW });
-            dimElements.tickYT.set({ x1: xY - tickSz, y1: br.top, x2: xY + tickSz, y2: br.top, strokeWidth: strokeW });
-            dimElements.tickYB.set({ x1: xY - tickSz, y1: br.top + br.height, x2: xY + tickSz, y2: br.top + br.height, strokeWidth: strokeW });
-            dimElements.textY.set({ text: h.toFixed(2) + ' mm', left: xY + (2/zoom), top: br.top + br.height/2, fontSize: fontSz, angle: -90, dimType: 'Y' });
+            // Breite entlang der Unterkante (bl→br), Höhe entlang der rechten Kante (tr→br)
+            _drawEdgeDim(corners.bl, corners.br, center,
+                dimElements.lineX, dimElements.tickXL, dimElements.tickXR, dimElements.textX,
+                w.toFixed(2) + ' mm', 'X', zoom, strokeW, fontSz);
+            _drawEdgeDim(corners.tr, corners.br, center,
+                dimElements.lineY, dimElements.tickYT, dimElements.tickYB, dimElements.textY,
+                h.toFixed(2) + ' mm', 'Y', zoom, strokeW, fontSz);
 
             dimElements.textX.measuredObj = obj;
             dimElements.textY.measuredObj = obj;
@@ -3984,7 +4020,7 @@
                 'machine.width':'Breite (X mm)', 'machine.height':'Höhe (Y mm)', 'machine.applySize':'Größe anwenden',
                 'panel.job':'🎛️ Job Kontrolle', 'job.run':'▶ Job Lasern', 'job.runShort':'Job Lasern', 'job.stop':'⏹ STOP / ABBRUCH',
                 'job.unlock':'Unlock', 'job.unlockTip':'Alarm entsperren (Unlock $X)',
-                'panel.control':'🕹️ Steuerung & Konsole', 'ctrl.send':'Befehl senden', 'ctrl.home':'Home',
+                'panel.control':'🕹️ Steuerung & Konsole', 'ctrl.send':'Befehl senden', 'ctrl.histHint':'↑/↓ blättert durch den Befehlsverlauf', 'ctrl.home':'Home',
                 'ctrl.homeTip':'Referenzfahrt (Home $H)', 'ctrl.zeroTip':'Aktuelle Position als X0/Y0 festlegen',
                 'ctrl.pumpOn':'Pumpe EIN', 'ctrl.pumpOff':'Pumpe AUS', 'ctrl.pumpTip':'Pumpe umschalten (M8/M9)',
                 'ctrl.jog':'🎯 Grafischer Jog-Controller',
@@ -4017,7 +4053,7 @@
                 'machine.width':'Width (X mm)', 'machine.height':'Height (Y mm)', 'machine.applySize':'Apply size',
                 'panel.job':'🎛️ Job Control', 'job.run':'▶ Run Job', 'job.runShort':'Run Job', 'job.stop':'⏹ STOP / ABORT',
                 'job.unlock':'Unlock', 'job.unlockTip':'Clear alarm (Unlock $X)',
-                'panel.control':'🕹️ Control & Console', 'ctrl.send':'Send command', 'ctrl.home':'Home',
+                'panel.control':'🕹️ Control & Console', 'ctrl.send':'Send command', 'ctrl.histHint':'↑/↓ scrolls through command history', 'ctrl.home':'Home',
                 'ctrl.homeTip':'Homing cycle (Home $H)', 'ctrl.zeroTip':'Set current position as X0/Y0',
                 'ctrl.pumpOn':'Pump ON', 'ctrl.pumpOff':'Pump OFF', 'ctrl.pumpTip':'Toggle pump (M8/M9)',
                 'ctrl.jog':'🎯 Graphical Jog Controller',
@@ -4050,7 +4086,7 @@
                 'machine.width':'Ancho (X mm)', 'machine.height':'Alto (Y mm)', 'machine.applySize':'Aplicar tamaño',
                 'panel.job':'🎛️ Control de trabajo', 'job.run':'▶ Ejecutar', 'job.runShort':'Ejecutar', 'job.stop':'⏹ PARAR / ABORTAR',
                 'job.unlock':'Desbloquear', 'job.unlockTip':'Quitar alarma (Unlock $X)',
-                'panel.control':'🕹️ Control y consola', 'ctrl.send':'Enviar comando', 'ctrl.home':'Inicio',
+                'panel.control':'🕹️ Control y consola', 'ctrl.send':'Enviar comando', 'ctrl.histHint':'↑/↓ recorre el historial de comandos', 'ctrl.home':'Inicio',
                 'ctrl.homeTip':'Ciclo de origen (Home $H)', 'ctrl.zeroTip':'Fijar posición actual como X0/Y0',
                 'ctrl.pumpOn':'Bomba ON', 'ctrl.pumpOff':'Bomba OFF', 'ctrl.pumpTip':'Alternar bomba (M8/M9)',
                 'ctrl.jog':'🎯 Controlador Jog gráfico',
@@ -4083,7 +4119,7 @@
                 'machine.width':'宽度 (X mm)', 'machine.height':'高度 (Y mm)', 'machine.applySize':'应用尺寸',
                 'panel.job':'🎛️ 任务控制', 'job.run':'▶ 运行任务', 'job.runShort':'运行', 'job.stop':'⏹ 停止 / 中止',
                 'job.unlock':'解锁', 'job.unlockTip':'清除报警 (Unlock $X)',
-                'panel.control':'🕹️ 控制与控制台', 'ctrl.send':'发送命令', 'ctrl.home':'回零',
+                'panel.control':'🕹️ 控制与控制台', 'ctrl.send':'发送命令', 'ctrl.histHint':'↑/↓ 浏览命令历史', 'ctrl.home':'回零',
                 'ctrl.homeTip':'回零循环 (Home $H)', 'ctrl.zeroTip':'将当前位置设为 X0/Y0',
                 'ctrl.pumpOn':'水泵 开', 'ctrl.pumpOff':'水泵 关', 'ctrl.pumpTip':'切换水泵 (M8/M9)',
                 'ctrl.jog':'🎯 图形点动控制器',
@@ -4600,6 +4636,7 @@
         let _snapEnabled = true;   // Alt = temporär deaktivieren
         let _magnetPoint = null;   // aktueller Snap-Punkt oder null
         let _snapIndicator = null; // visueller Indikator (Kreis)
+        let _snapExcludeChainIds = null; // beim Handle-Ziehen: eigene (+ verbundene) Ketten vom Snap ausschließen
 
         function _ensureSnapIndicator() {
             if (_snapIndicator) return;
@@ -4657,7 +4694,17 @@
 
             // Polylinie-Segment oder einfache Linie
             if (obj.customType === 'polyLine' || t === 'line') {
-                let c = getAbsoluteLineEndpoints(obj);
+                let c;
+                // Für Polylinien die autoritativen chainPoints nutzen – immer korrekt,
+                // unabhängig davon, ob die Polylinie schon einmal (de)markiert wurde.
+                if (obj.customType === 'polyLine' && obj.chainPoints &&
+                    obj.chainPoints[obj.segmentIndex] && obj.chainPoints[obj.segmentIndex + 1]) {
+                    let p1 = obj.chainPoints[obj.segmentIndex];
+                    let p2 = obj.chainPoints[obj.segmentIndex + 1];
+                    c = { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+                } else {
+                    c = getAbsoluteLineEndpoints(obj);
+                }
                 snapPts.push({ x: c.x1, y: c.y1, type: 'endpoint' });
                 snapPts.push({ x: c.x2, y: c.y2, type: 'endpoint' });
                 snapSegs.push({ p1:{x:c.x1,y:c.y1}, p2:{x:c.x2,y:c.y2} });
@@ -4821,6 +4868,32 @@
             });
         }
 
+        // Position eines Handles in seine Kette übernehmen (chainPoints + angrenzende Linien)
+        function _applyHandlePosition(h) {
+            let idx = h.pointIndex;
+            h.chainPoints[idx] = { x: h.left, y: h.top };
+            // vorherige Linie: ihr zweiter Endpunkt folgt dem Handle
+            if (idx > 0) {
+                updateLineForSVG(h.chainLines[idx - 1],
+                    h.chainPoints[idx - 1].x, h.chainPoints[idx - 1].y, h.left, h.top);
+            }
+            // nächste Linie: ihr erster Endpunkt folgt dem Handle
+            if (idx < h.chainLines.length) {
+                updateLineForSVG(h.chainLines[idx],
+                    h.left, h.top, h.chainPoints[idx + 1].x, h.chainPoints[idx + 1].y);
+            }
+        }
+
+        // Zwei Handles dauerhaft verbinden (verschmelzen) → gemeinsame linkGroup
+        function _linkHandles(a, b) {
+            if (!a || !b || a === b) return;
+            let ga = a.linkGroup || [a];
+            let gb = b.linkGroup || [b];
+            if (ga === gb) return; // bereits verbunden
+            gb.forEach(h => { if (ga.indexOf(h) === -1) ga.push(h); });
+            ga.forEach(h => { h.linkGroup = ga; });
+        }
+
         // Besten Snap-Punkt für den Mauszeiger ermitteln (alle Objekt-Typen)
         function getMagnetSnap(pointer) {
             if (!_snapEnabled) return null;
@@ -4834,11 +4907,13 @@
             canvas.getObjects().forEach(obj => {
                 if (!obj.visible || obj === previewLine || obj.excludeFromExport ||
                     obj.isDimension || obj.customType === 'polyHandle') return;
+                if (_snapExcludeChainIds && obj.chainId && _snapExcludeChainIds.has(obj.chainId)) return;  // eigene/verbundene Ketten ausschließen
                 _collectObjSnapData(obj, snapPts, snapSegs);
             });
             // polyHandle-Positionen als starke Endpunkte
             canvas.getObjects().forEach(o => {
-                if (o.customType === 'polyHandle' && o.visible)
+                if (o.customType === 'polyHandle' && o.visible &&
+                    !(_snapExcludeChainIds && o.chainId && _snapExcludeChainIds.has(o.chainId)))
                     snapPts.push({ x:o.left, y:o.top, type:'endpoint' });
             });
 
@@ -4959,6 +5034,22 @@
             let obj = e.target;
             if (!obj) return;
 
+            _hideSnap();   // Snap-Indikator nach dem Loslassen ausblenden
+
+            // Verschmelzen: Liegt der losgelassene Eckpunkt exakt auf einem anderen
+            // Eckpunkt (eingerastet), werden beide dauerhaft verbunden.
+            // (auch versteckte Handles nicht markierter Polylinien berücksichtigen –
+            //  man kann auf deren Ecken einrasten, ohne dass sie markiert sind)
+            if (obj.customType === 'polyHandle') {
+                let c = obj.getCenterPoint();
+                let eps = 1.0;
+                canvas.getObjects().forEach(o => {
+                    if (o === obj || o.customType !== 'polyHandle') return;
+                    let oc = o.getCenterPoint();
+                    if (Math.abs(oc.x - c.x) < eps && Math.abs(oc.y - c.y) < eps) _linkHandles(obj, o);
+                });
+            }
+
             let chainsToFix = new Set();
             // Wurden Handles bewegt? Dann sind Handles die Quelle der Wahrheit.
             // Wurden nur Linien bewegt (Doppelklick-Gruppe ohne Handles), dann Linienpositionen nutzen.
@@ -4967,9 +5058,12 @@
             if (obj.chainId) {
                 chainsToFix.add(obj.chainId);
                 handlesWereMoved = (obj.customType === 'polyHandle');
+                // verbundene Handles → deren Ketten ebenfalls neu aufbauen
+                if (obj.linkGroup) obj.linkGroup.forEach(h => { if (h.chainId) chainsToFix.add(h.chainId); });
             } else if (obj.type === 'activeSelection') {
                 obj.getObjects().forEach(o => {
                     if (o.chainId) chainsToFix.add(o.chainId);
+                    if (o.linkGroup) o.linkGroup.forEach(h => { if (h.chainId) chainsToFix.add(h.chainId); });
                 });
                 handlesWereMoved = obj.getObjects().some(o => o.customType === 'polyHandle');
             }
@@ -5272,7 +5366,75 @@
             setMachineConnectionState(false); // Status sofort auf Rot setzen
             logMessage("SYSTEM", "Verbindung getrennt.", "#ff9900");
         }
-        function sendGcode() { const cmd = document.getElementById('gcodeInput').value; if(!cmd) return; ws.send(JSON.stringify({ action: "send_gcode", command: cmd })); logMessage("USER", cmd, "#fff"); document.getElementById('gcodeInput').value = ''; }
+        // --- Befehls-Historie (Terminal-Stil: ↑/↓, persistent, max 50) ---
+        const GCODE_HISTORY_KEY = 'gcodeHistory';
+        const GCODE_HISTORY_MAX = 50;
+        let _gcodeHistory = [];      // älteste→neueste
+        let _gcodeHistIdx = -1;      // -1 = aktuelle Eingabe (nicht im Verlauf)
+        let _gcodeDraft = '';        // gemerkte Eingabe vor dem Blättern
+
+        function _loadGcodeHistory() {
+            try {
+                let raw = localStorage.getItem(GCODE_HISTORY_KEY);
+                let arr = raw ? JSON.parse(raw) : [];
+                return Array.isArray(arr) ? arr.slice(-GCODE_HISTORY_MAX) : [];
+            } catch (e) { return []; }
+        }
+        function _pushGcodeHistory(cmd) {
+            cmd = (cmd || '').trim();
+            if (!cmd) return;
+            // direkt aufeinanderfolgende Duplikate nicht doppelt speichern
+            if (!_gcodeHistory.length || _gcodeHistory[_gcodeHistory.length - 1] !== cmd) {
+                _gcodeHistory.push(cmd);
+                if (_gcodeHistory.length > GCODE_HISTORY_MAX)
+                    _gcodeHistory = _gcodeHistory.slice(-GCODE_HISTORY_MAX);
+                try { localStorage.setItem(GCODE_HISTORY_KEY, JSON.stringify(_gcodeHistory)); } catch (e) {}
+            }
+            _gcodeHistIdx = -1;
+            _gcodeDraft = '';
+        }
+        function _setupGcodeHistory() {
+            let input = document.getElementById('gcodeInput');
+            if (!input) return;
+            _gcodeHistory = _loadGcodeHistory();
+            input.addEventListener('keydown', function(e) {
+                // Enter wird separat per 'keypress' behandelt (kein Doppel-Senden hier)
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (_gcodeHistory.length === 0) return;
+                    if (_gcodeHistIdx === -1) {
+                        _gcodeDraft = input.value;                 // aktuellen Entwurf merken
+                        _gcodeHistIdx = _gcodeHistory.length - 1;  // neuester Eintrag
+                    } else if (_gcodeHistIdx > 0) {
+                        _gcodeHistIdx--;                           // weiter zurück (älter)
+                    }
+                    input.value = _gcodeHistory[_gcodeHistIdx];
+                    setTimeout(() => { input.selectionStart = input.selectionEnd = input.value.length; }, 0);
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (_gcodeHistIdx === -1) return;
+                    if (_gcodeHistIdx < _gcodeHistory.length - 1) {
+                        _gcodeHistIdx++;                           // neuer
+                        input.value = _gcodeHistory[_gcodeHistIdx];
+                    } else {
+                        _gcodeHistIdx = -1;                        // zurück zur aktuellen Eingabe
+                        input.value = _gcodeDraft;
+                    }
+                    setTimeout(() => { input.selectionStart = input.selectionEnd = input.value.length; }, 0);
+                }
+            });
+        }
+        window.addEventListener('load', _setupGcodeHistory);
+
+        function sendGcode() {
+            const input = document.getElementById('gcodeInput');
+            const cmd = input.value;
+            if (!cmd) return;
+            ws.send(JSON.stringify({ action: "send_gcode", command: cmd }));
+            logMessage("USER", cmd, "#fff");
+            _pushGcodeHistory(cmd);     // in den Verlauf aufnehmen (persistiert)
+            input.value = '';
+        }
         function sendHome() { ws.send(JSON.stringify({ action: "send_gcode", command: "$H" })); logMessage("USER", "$H", "#fff"); }
         function setZero() { 
             ws.send(JSON.stringify({ action: "send_gcode", command: "G10 L20 P1 X0 Y0" })); 
