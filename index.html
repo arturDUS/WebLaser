@@ -1122,6 +1122,11 @@
     <input type="number" id="floatDimX" class="floating-dim" style="display:none;" step="0.1">
     <input type="number" id="floatDimY" class="floating-dim" style="display:none;" step="0.1">
 
+    <!-- Live-Anzeige Länge/Winkel beim Zeichnen einer Polylinie -->
+    <div id="polyInfoLabel" style="display:none; position:fixed; z-index:2500; pointer-events:none;
+         background:rgba(20,20,20,0.92); color:#fff; font:12px/1.4 monospace; white-space:nowrap;
+         padding:3px 7px; border:1px solid #3498db; border-radius:4px; box-shadow:0 2px 6px rgba(0,0,0,0.5);"></div>
+
     <script>
         // ==========================================
         // 1. SETUP & GEOMETRISCHE INDIKATOREN
@@ -1451,16 +1456,28 @@
                     chainPoints: activePoints, chainLines: activeLines, chainHandles: activeHandles
                 });
 
-                handle.on('moving', function() {
+                handle.on('moving', function(opt) {
                     let idx = this.pointIndex;
+                    _polyHandleDragging = true;
 
-                    // Magnet-Snapping beim Verschieben des Eckpunkts
-                    // (eigene Kette + bereits verbundene Ketten vom Snap ausschließen,
-                    //  damit ein verschmolzener Punkt nicht auf sich selbst einrastet)
-                    _snapExcludeChainIds = new Set([this.chainId]);
-                    if (this.linkGroup) this.linkGroup.forEach(h => { if (h.chainId) _snapExcludeChainIds.add(h.chainId); });
+                    // Magnet-Snapping beim Verschieben des Eckpunkts.
+                    // Ausschließen: nur das gezogene Handle selbst (+ verbundene) und deren
+                    // ANGRENZENDE Segmente – damit der Punkt nicht trivial auf sich selbst
+                    // einrastet, aber sehr wohl auf die ANDEREN Eckpunkte/Segmente der
+                    // eigenen Polylinie einrasten kann.
+                    _snapExcludeHandles = new Set();
+                    _snapExcludeSegments = new Set();
+                    let _grp = this.linkGroup || [this];
+                    for (let h of _grp) {
+                        if (h !== this && !canvas.contains(h)) continue;
+                        _snapExcludeHandles.add(h);
+                        let hi = h.pointIndex;
+                        if (hi > 0 && h.chainLines[hi - 1]) _snapExcludeSegments.add(h.chainLines[hi - 1]);
+                        if (hi < h.chainLines.length && h.chainLines[hi]) _snapExcludeSegments.add(h.chainLines[hi]);
+                    }
                     let snap = getMagnetSnap({ x: this.left, y: this.top });
-                    _snapExcludeChainIds = null;
+                    _snapExcludeHandles = null;
+                    _snapExcludeSegments = null;
                     if (snap) {
                         this.set({ left: snap.x, top: snap.y });
                         _showSnap(snap.x, snap.y, snap.type);
@@ -1485,6 +1502,30 @@
                         previewLine.set({ x1: this.left, y1: this.top });
                     }
                     canvas.requestRenderAll();
+
+                    // Live-Anzeige: Länge(n) der betroffenen Segmente + Winkel zueinander
+                    let cp = this.chainPoints;
+                    let hasPrev = idx > 0;                          // Segment davor (chainPoints[idx-1])
+                    let hasNext = idx < this.chainLines.length;     // Segment danach (chainPoints[idx+1])
+                    let lp = hasPrev ? Math.hypot(this.left - cp[idx-1].x, this.top - cp[idx-1].y) : 0;
+                    let ln = hasNext ? Math.hypot(cp[idx+1].x - this.left, cp[idx+1].y - this.top) : 0;
+                    let info;
+                    if (hasPrev && hasNext) {
+                        // Mittlerer Eckpunkt: zwei Längen + Innenwinkel am Eckpunkt
+                        let v1x = cp[idx-1].x - this.left, v1y = cp[idx-1].y - this.top;
+                        let v2x = cp[idx+1].x - this.left, v2y = cp[idx+1].y - this.top;
+                        let n1 = Math.hypot(v1x, v1y), n2 = Math.hypot(v2x, v2y), angTxt = '–';
+                        if (n1 > 1e-6 && n2 > 1e-6) {
+                            let c = Math.max(-1, Math.min(1, (v1x*v2x + v1y*v2y) / (n1*n2)));
+                            angTxt = (Math.acos(c) * 180 / Math.PI).toFixed(1) + '°';
+                        }
+                        info = 'L1: ' + lp.toFixed(1) + ' mm   L2: ' + ln.toFixed(1) + ' mm   ∠: ' + angTxt;
+                    } else if (hasPrev) {
+                        info = 'L: ' + lp.toFixed(1) + ' mm';        // Endpunkt
+                    } else if (hasNext) {
+                        info = 'L: ' + ln.toFixed(1) + ' mm';        // Startpunkt
+                    }
+                    if (info) _showPolyInfo(opt && opt.e, info);
                 });
 
                 activeHandles.push(handle);
@@ -4636,7 +4677,11 @@
         let _snapEnabled = true;   // Alt = temporär deaktivieren
         let _magnetPoint = null;   // aktueller Snap-Punkt oder null
         let _snapIndicator = null; // visueller Indikator (Kreis)
-        let _snapExcludeChainIds = null; // beim Handle-Ziehen: eigene (+ verbundene) Ketten vom Snap ausschließen
+        // Beim Handle-Ziehen vom Snap ausschließen: das gezogene Handle selbst (+ verbundene)
+        // sowie nur dessen ANGRENZENDE Segmente. So bleibt das Einrasten auf die eigenen
+        // anderen Eckpunkte/Segmente der Polylinie möglich.
+        let _snapExcludeHandles = null;   // Set<fabric.Object> (Handles)
+        let _snapExcludeSegments = null;  // Set<fabric.Object> (Liniensegmente)
 
         function _ensureSnapIndicator() {
             if (_snapIndicator) return;
@@ -4907,13 +4952,13 @@
             canvas.getObjects().forEach(obj => {
                 if (!obj.visible || obj === previewLine || obj.excludeFromExport ||
                     obj.isDimension || obj.customType === 'polyHandle') return;
-                if (_snapExcludeChainIds && obj.chainId && _snapExcludeChainIds.has(obj.chainId)) return;  // eigene/verbundene Ketten ausschließen
+                if (_snapExcludeSegments && _snapExcludeSegments.has(obj)) return;  // angrenzende Segmente des gezogenen Punkts ausschließen
                 _collectObjSnapData(obj, snapPts, snapSegs);
             });
             // polyHandle-Positionen als starke Endpunkte
             canvas.getObjects().forEach(o => {
                 if (o.customType === 'polyHandle' && o.visible &&
-                    !(_snapExcludeChainIds && o.chainId && _snapExcludeChainIds.has(o.chainId)))
+                    !(_snapExcludeHandles && _snapExcludeHandles.has(o)))
                     snapPts.push({ x:o.left, y:o.top, type:'endpoint' });
             });
 
@@ -4965,7 +5010,13 @@
 
         // 2. Mausbewegung fangen (Vorschau-Linie & Snapping)
         canvas.on('mouse:move', function(o) {
-            if (!isPolyMode || activePoints.length === 0 || !previewLine || document.getElementById('cadDialog').style.display === 'block') return;
+            if (!isPolyMode || activePoints.length === 0 || !previewLine || document.getElementById('cadDialog').style.display === 'block') {
+                // Nicht ausblenden, während gerade ein Eckpunkt gezogen wird –
+                // dieser Handler feuert parallel zum Handle-'moving' und würde sonst
+                // das vom Drag gesetzte Label sofort wieder verstecken.
+                if (!_polyHandleDragging) _hidePolyInfo();
+                return;
+            }
 
             let pointer = canvas.getPointer(o.e);
             let lastPt = activePoints[activePoints.length - 1];
@@ -4994,7 +5045,65 @@
 
             previewLine.set({ x2: finalX, y2: finalY });
             canvas.renderAll();
+
+            // Live-Anzeige: Länge (mm) + Winkel
+            let segLen = Math.hypot(finalX - lastPt.x, finalY - lastPt.y);
+            let infoText;
+            if (activePoints.length >= 2) {
+                // Folgesegment: Innenwinkel zur vorherigen Linie (am gemeinsamen Eckpunkt)
+                let prevPt = activePoints[activePoints.length - 2];
+                let v1x = prevPt.x - lastPt.x, v1y = prevPt.y - lastPt.y;   // zurück entlang vorheriger Linie
+                let v2x = finalX - lastPt.x,  v2y = finalY - lastPt.y;      // aktuelle Linie
+                let n1 = Math.hypot(v1x, v1y), n2 = Math.hypot(v2x, v2y);
+                let angTxt = '–';
+                if (n1 > 1e-6 && n2 > 1e-6) {
+                    let cos = (v1x * v2x + v1y * v2y) / (n1 * n2);
+                    cos = Math.max(-1, Math.min(1, cos));
+                    angTxt = (Math.acos(cos) * 180 / Math.PI).toFixed(1) + '°';
+                }
+                infoText = 'L: ' + segLen.toFixed(1) + ' mm   ∠ vorh.: ' + angTxt;
+            } else {
+                // Erstes Segment: Winkel zur Y-Achse des Arbeitsbereichs
+                // (0° = nach oben, 90° = rechts, 180° = unten, 270° = links)
+                let dx = finalX - lastPt.x, dy = finalY - lastPt.y;
+                let angY = Math.atan2(dx, -dy) * 180 / Math.PI;
+                if (angY < 0) angY += 360;
+                infoText = 'L: ' + segLen.toFixed(1) + ' mm   ∠ Y: ' + angY.toFixed(1) + '°';
+            }
+            _showPolyInfo(o.e, infoText);
         });
+
+        // Letzte Mausposition global mitschreiben (für das Live-Label, da das
+        // Fabric-'moving'-Event nicht zuverlässig Bildschirmkoordinaten liefert)
+        let _lastClientX = 0, _lastClientY = 0;
+        let _polyHandleDragging = false;   // true, solange ein Eckpunkt gezogen wird
+        window.addEventListener('mousemove', function(e) {
+            _lastClientX = e.clientX;
+            _lastClientY = e.clientY;
+        }, true);
+        // Ende des Eckpunkt-Ziehens → Flag zurücksetzen, Label ausblenden
+        canvas.on('mouse:up', function() {
+            if (_polyHandleDragging) {
+                _polyHandleDragging = false;
+                _hidePolyInfo();
+            }
+        });
+
+        // Live-Label (Länge/Winkel) beim Polylinien-Zeichnen anzeigen/positionieren
+        function _showPolyInfo(evt, text) {
+            let el = document.getElementById('polyInfoLabel');
+            if (!el) return;
+            let cx = (evt && typeof evt.clientX === 'number') ? evt.clientX : _lastClientX;
+            let cy = (evt && typeof evt.clientY === 'number') ? evt.clientY : _lastClientY;
+            el.textContent = text;
+            el.style.left = (cx + 16) + 'px';
+            el.style.top  = (cy + 16) + 'px';
+            el.style.display = 'block';
+        }
+        function _hidePolyInfo() {
+            let el = document.getElementById('polyInfoLabel');
+            if (el) el.style.display = 'none';
+        }
 
         // 3. Tasten-Handler: ESC = Beenden, Alt = Magnet temporär aus
         window.addEventListener('keydown', function(e) {
@@ -5008,6 +5117,7 @@
                     previewLine = null;
                 }
                 _hideSnap();
+                _hidePolyInfo();
                 canvas.discardActiveObject();
                 updatePolyHandleVisibility();
                 canvas.renderAll();
@@ -5034,7 +5144,8 @@
             let obj = e.target;
             if (!obj) return;
 
-            _hideSnap();   // Snap-Indikator nach dem Loslassen ausblenden
+            _hideSnap();      // Snap-Indikator nach dem Loslassen ausblenden
+            _hidePolyInfo();  // Live-Längen/Winkel-Label ausblenden
 
             // Verschmelzen: Liegt der losgelassene Eckpunkt exakt auf einem anderen
             // Eckpunkt (eingerastet), werden beide dauerhaft verbunden.

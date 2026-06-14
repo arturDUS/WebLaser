@@ -99,9 +99,12 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 | **USB (COM) / Wi-Fi** | Choose connection type |
 | **Port + Baud** (USB) | COM port (`🔄` scans available ports) and baud rate (default 115200) |
 | **IP + Port** (Wi-Fi) | IP address and port of the network controller |
+| **Mode** (Wi-Fi) | **Auto-detect** (recommended), **Telnet** (FluidNC, port 23) or **WebUI** (ESP3D / Grbl_ESP32). With "Auto" the server tries Telnet first and falls back to WebUI. |
 | **🔌 Connect / 🛑 Disconnect** | Open/close the connection |
 | **📡 Data** | Reads machine settings via `$$` (e.g. work area `$130/$131`, max power `$30`, laser mode `$32`) and applies them automatically |
 | **📐 Work area** | Width/height in mm — defines the canvas (button `✔️` applies the size) |
+
+> 🔎 **Firmware detection:** On connect the system automatically detects the firmware (**FluidNC** or **Grbl/Grbl_ESP32**) and the transport, and reports it in the log (e.g. "Connected: FluidNC via Telnet"). FluidNC v4 over Wi-Fi is addressed via **Telnet**.
 
 ### 4.2 🎛️ Job Control
 
@@ -120,7 +123,7 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 
 | Element | Function |
 |---|---|
-| G-code input + `✉️` | Send individual G-code commands directly |
+| G-code input + `✉️` | Send individual G-code commands directly. **Terminal-style command history:** use **↑/↓** to scroll through recently sent commands. The history survives a program restart (`localStorage`, max. 50 entries). |
 | **Home** | Homing cycle (`$H`) |
 | **X0/Y0** | Set current position as origin |
 | **Pump ON/OFF** | Toggle extraction/air manually (`M8`/`M9`) |
@@ -197,7 +200,7 @@ Save/load the complete project (see [13](#13-save--load-project)). Located at th
 
 ### 7.1 ▭ Rectangle & ◯ Circle
 
-Creates a rectangle or circle on the canvas. Size and position are then changed with the mouse handles or via the **dimension labels** (clicking a displayed dimension opens an input field).
+Creates a rectangle or circle on the canvas. Size and position are then changed with the mouse handles or via the **dimension labels** (clicking a displayed dimension opens an input field). When an object is **rotated**, the dimension lines rotate with it and run along the rotated edges.
 
 <img width="653" height="339" alt="image" src="https://github.com/user-attachments/assets/56e50461-ca31-4894-854a-97456539cede" />
 
@@ -207,7 +210,10 @@ Click points one after another to draw a polyline. **ESC** finishes.
 
 - **Angle snapping:** snaps to 45° steps when close.
 - **Magnet snapping:** near other objects the cursor snaps to endpoints (strong, cyan), intersections (green) or edges (weak, orange). Hold **Alt** to temporarily disable the magnet.
-- **Editing:** *single click* on a segment/handle selects it individually (length editable via dimension label, vertex movable via blue handle). *Double click* selects the **entire** polyline for move/rotate/scale.
+- **Live dimensions while drawing:** while placing a line's end point, a small label at the cursor shows **length (mm) and angle**. For the **first** segment the angle is **relative to the work-area Y axis** (0° = up, 90° = right); for every **further** segment the **interior angle to the previous line** (180° = straight on, 90° = right angle).
+- **Editing:** *single click* on a segment/handle selects it individually (length editable via dimension label, vertex movable via handle). *Double click* selects the **entire** polyline for move/rotate/scale. The vertex handles are drawn as small, unfilled squares.
+- **Move vertices with magnet:** dragging a vertex also snaps magnetically — to other objects **and to the other vertices/edges of the same polyline**. While dragging, the label shows the length(s) of the affected segments live and (for a middle vertex) the angle between them.
+- **Connect (merge) vertices:** if you release a vertex while it is snapped onto another vertex, the two are **permanently linked**. Moving the shared point afterwards moves **all** affected lines (e.g. to couple two polylines or close a loop). *Note:* links apply to the current session and are not saved with the project.
 
 <img width="305" height="246" alt="image" src="https://github.com/user-attachments/assets/0c9629c7-ba8f-4952-a89e-edc0c6cc9335" />
 
@@ -438,6 +444,7 @@ The job is sent to `agent.py` as a "mixed job". The backend builds a G-code list
 | **Del / Delete** | Delete selected objects |
 | **Alt** (hold) | Temporarily disable magnet snapping while drawing |
 | **Double click** (polyline) | Select the entire polyline |
+| **↑ / ↓** (G-code input) | Scroll through the command history |
 
 ---
 

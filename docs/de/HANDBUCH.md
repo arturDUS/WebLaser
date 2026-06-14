@@ -100,9 +100,12 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 | **USB (COM) / WLAN** | Verbindungsart wählen |
 | **Port + Baud** (USB) | COM-Port (`🔄` scannt verfügbare Ports) und Baudrate (Standard 115200) |
 | **IP + Port** (WLAN) | IP-Adresse und Port des Netzwerk-Controllers |
+| **Modus** (WLAN) | **Auto-Erkennung** (empfohlen), **Telnet** (FluidNC, Port 23) oder **WebUI** (ESP3D / Grbl_ESP32). Bei „Auto" probiert der Server zuerst Telnet und fällt sonst auf WebUI zurück. |
 | **🔌 Verbinden / 🛑 Trennen** | Verbindung auf-/abbauen |
 | **📡 Daten** | Liest die Maschinen-Einstellungen via `$$` (z. B. Arbeitsbereichsgröße `$130/$131`, Max-Power `$30`, Lasermodus `$32`) und übernimmt sie automatisch |
 | **📐 Arbeitsbereich** | Breite/Höhe in mm — definiert die Zeichenfläche (Button `✔️` wendet die Größe an) |
+
+> 🔎 **Firmware-Erkennung:** Beim Verbinden erkennt das System automatisch die Firmware (**FluidNC** bzw. **Grbl/Grbl_ESP32**) und die Transportart und meldet sie im Log (z. B. „Verbunden: FluidNC über Telnet"). FluidNC v4 über WLAN wird per **Telnet** angesprochen.
 
 ### 4.2 🎛️ Job Kontrolle
 
@@ -120,7 +123,7 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 
 | Element | Funktion |
 |---|---|
-| G-Code-Eingabe + `✉️` | Einzelne G-Code-Befehle direkt senden |
+| G-Code-Eingabe + `✉️` | Einzelne G-Code-Befehle direkt senden. **Befehls-Historie wie im Terminal:** mit **↑/↓** durch die zuletzt gesendeten Befehle blättern. Die Historie bleibt über einen Programm-Neustart erhalten (`localStorage`, max. 50 Einträge). |
 | **Home** | Referenzfahrt (`$H`) |
 | **X0/Y0** | Aktuelle Position als Nullpunkt setzen |
 | **Pumpe EIN/AUS** | Absaugung/Luft manuell schalten (`M8`/`M9`) |
@@ -197,7 +200,7 @@ Speichern/Laden des kompletten Projekts (siehe [13](#13-projekt-speichern--laden
 
 ### 7.1 ▭ Rechteck & ◯ Kreis
 
-Erzeugt ein Rechteck bzw. einen Kreis im Arbeitsbereich. Größe und Position werden danach mit den Maus-Griffen oder über die **Bemaßungs-Maßzahlen** geändert (Klick auf die angezeigte Maßzahl öffnet ein Eingabefeld).
+Erzeugt ein Rechteck bzw. einen Kreis im Arbeitsbereich. Größe und Position werden danach mit den Maus-Griffen oder über die **Bemaßungs-Maßzahlen** geändert (Klick auf die angezeigte Maßzahl öffnet ein Eingabefeld). Wird ein Objekt **gedreht**, drehen sich die Maßlinien mit und liegen entlang der gedrehten Kanten.
 
 <img width="670" height="357" alt="image" src="https://github.com/user-attachments/assets/836ce25f-8282-4f04-9300-3e64e07c6d12" />
 
@@ -207,7 +210,10 @@ Klicke nacheinander Punkte, um einen Linienzug zu zeichnen. **ESC** beendet das 
 
 - **Winkel-Snapping:** In der Nähe von 45°-Schritten rastet die Linie ein.
 - **Magnet-Snapping:** In der Nähe anderer Objekte rastet der Cursor auf Endpunkte (stark, cyan), Kreuzungen (grün) oder Kanten (schwach, orange) ein. **Alt** gedrückt halten deaktiviert den Magneten kurzzeitig.
-- **Bearbeiten:** *Einfachklick* auf ein Segment/Handle wählt es einzeln (Länge per Maßzahl änderbar, Eckpunkt per blauem Handle verschiebbar). *Doppelklick* wählt den **gesamten** Linienzug zum Verschieben/Drehen/Skalieren.
+- **Live-Maße beim Zeichnen:** Während du den Endpunkt einer Linie setzt, zeigt ein kleines Label am Cursor **Länge (mm) und Winkel**. Beim **ersten** Segment der Winkel **zur Y-Achse des Arbeitsbereichs** (0° = nach oben, 90° = rechts), bei jedem **weiteren** Segment der **Innenwinkel zur vorherigen Linie** (180° = gerade weiter, 90° = rechter Winkel).
+- **Bearbeiten:** *Einfachklick* auf ein Segment/Handle wählt es einzeln (Länge per Maßzahl änderbar, Eckpunkt per Handle verschiebbar). *Doppelklick* wählt den **gesamten** Linienzug zum Verschieben/Drehen/Skalieren. Die Eckpunkt-Handles werden als kleine, ungefüllte Quadrate dargestellt.
+- **Eckpunkte verschieben mit Magnet:** Beim Ziehen eines Eckpunkts rastet dieser ebenfalls magnetisch ein — auf andere Objekte **und auf die anderen Eckpunkte/Kanten der eigenen Polylinie**. Dabei zeigt das Label live die Länge(n) der betroffenen Segmente und (bei einem Mittelpunkt) den Winkel zwischen ihnen.
+- **Eckpunkte verbinden (verschmelzen):** Lässt du einen Eckpunkt los, während er auf einem anderen Eckpunkt eingerastet ist, werden beide **dauerhaft verbunden**. Verschiebst du danach den gemeinsamen Punkt, folgen **alle** beteiligten Linien (z. B. um zwei Linienzüge zu koppeln oder eine Schleife zu schließen). *Hinweis:* Verbindungen gelten für die laufende Sitzung und werden nicht mit dem Projekt gespeichert.
 
 <img width="240" height="201" alt="image" src="https://github.com/user-attachments/assets/df2e9432-b9cb-4c7c-8fbd-47385653c169" />
 
@@ -438,6 +444,7 @@ Der Job wird als „Mixed Job" an `agent.py` gesendet. Das Backend baut daraus e
 | **Entf / Delete** | Markierte Objekte löschen |
 | **Alt** (halten) | Magnet-Snapping beim Zeichnen kurzzeitig aus |
 | **Doppelklick** (Polylinie) | Gesamten Linienzug auswählen |
+| **↑ / ↓** (G-Code-Eingabe) | Durch die Befehls-Historie blättern |
 
 ---
 

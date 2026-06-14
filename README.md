@@ -23,14 +23,14 @@
 
 ### ✨ Funktionen
 
-- **Zeichnen:** Rechteck, Kreis, Linienzug (mit Winkel- & Magnet-Snapping), Vektor-Text (TTF/OTF), Formen-Bibliothek (14 Formen)
+- **Zeichnen:** Rechteck, Kreis, Linienzug (Winkel- & Magnet-Snapping, Live-Anzeige von Länge & Winkel, Eckpunkte verschieben/verbinden), Vektor-Text (TTF/OTF), Formen-Bibliothek (14 Formen)
 - **Box-Generator:** Finger-Joint-Kästen (Rechteck, Trapez, Pult, Parallelogramm) mit automatischer Winkelkompensation
 - **Foto-Gravur:** Graustufen-Leistung oder Floyd-Steinberg-Dithering, Zuschneiden & In-Form-Clippen
 - **Import:** SVG (in Einzelteile zerlegt) und Bilder
 - **Ebenen:** Schneiden / Gravieren / Hilfslinie / Ignorieren — je Objekt mit Speed, Power, Durchläufen
 - **Materialbibliothek:** serverseitig gespeichert (`materials.json`), für alle Clients im Netzwerk
 - **Parameter-Test:** Gravur-/Schnitt-Matrix wie bei LightBurn, inkl. Bewertung & Material-Speicherung
-- **Maschine:** USB (COM) & WLAN, Jog-Controller, Pumpensteuerung (M8/M9 mit Nachlauf)
+- **Maschine:** USB (COM) & WLAN (**FluidNC** & Grbl_ESP32, Firmware-Auto-Erkennung, Telnet/WebUI), Jog-Controller, Befehls-Historie (↑/↓), Pumpensteuerung (M8/M9 mit Nachlauf)
 - **Projekt:** Speichern/Laden aller Objekte (inkl. Bilder & SVG) mit Datei-Dialog
 - **Mehrsprachig:** Deutsch, English, Español, 中文
 
@@ -115,14 +115,14 @@ MIT — siehe [Lizenz / License](#-lizenz--license) am Ende.
 
 ### ✨ Features
 
-- **Drawing:** rectangle, circle, polyline (with angle & magnet snapping), vector text (TTF/OTF), shape library (14 shapes)
+- **Drawing:** rectangle, circle, polyline (angle & magnet snapping, live length & angle readout, move/connect vertices), vector text (TTF/OTF), shape library (14 shapes)
 - **Box generator:** finger-joint boxes (rectangle, trapezoid, lectern, parallelogram) with automatic angle compensation
 - **Photo engraving:** grayscale power or Floyd-Steinberg dithering, cropping & fit-into-shape clipping
 - **Import:** SVG (split into individual parts) and images
 - **Layers:** cut / engrave / guide / ignore — per object with speed, power, passes
 - **Material library:** stored server-side (`materials.json`), shared across all clients on the network
 - **Parameter test:** engrave/cut matrix like LightBurn, incl. evaluation & material saving
-- **Machine:** USB (COM) & Wi-Fi, jog controller, pump control (M8/M9 with after-run)
+- **Machine:** USB (COM) & Wi-Fi (**FluidNC** & Grbl_ESP32, firmware auto-detection, Telnet/WebUI), jog controller, command history (↑/↓), pump control (M8/M9 with after-run)
 - **Project:** save/load all objects (incl. images & SVG) via a file dialog
 - **Multilingual:** Deutsch, English, Español, 中文
 
