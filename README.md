@@ -3,7 +3,7 @@
 # 🔥 TheBurner — Web-based Laser Cutter Control
 
 <p align="center">
-  <img width="1790" height="1366" alt="TheBurner UI" src="https://github.com/user-attachments/assets/b6b48261-b762-420c-8eaa-de5a2a32061c" />
+  <img width="1957" height="1235" alt="image" src="https://github.com/user-attachments/assets/b60302c8-f23a-46f2-9643-2c639e6ab46a" />
 </p>
 
 <p align="center">
