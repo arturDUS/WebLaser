@@ -102,7 +102,8 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 | **Mode** (Wi-Fi) | **Auto-detect** (recommended), **Telnet** (FluidNC, port 23) or **WebUI** (ESP3D / Grbl_ESP32). With "Auto" the server tries Telnet first and falls back to WebUI. |
 | **🔌 Connect / 🛑 Disconnect** | Open/close the connection |
 | **📡 Data** | Reads machine settings via `$$` (e.g. work area `$130/$131`, max power `$30`, laser mode `$32`) and applies them automatically |
-| **📐 Work area** | Width/height in mm — defines the canvas (button `✔️` applies the size) |
+
+> 📐 **Work-area size:** the width/height (mm) input fields are now in the **top bar of the workspace** (see [section 5](#5-workspace-canvas)).
 
 > 🔎 **Firmware detection:** On connect the system automatically detects the firmware (**FluidNC** or **Grbl/Grbl_ESP32**) and the transport, and reports it in the log (e.g. "Connected: FluidNC via Telnet"). FluidNC v4 over Wi-Fi is addressed via **Telnet**.
 
@@ -116,6 +117,20 @@ The interface has three areas: **left sidebar** (machine/control), **workspace**
 | **⏹ STOP / ABORT** | Immediately aborts the running job (GRBL soft reset). The pump keeps running for ~10 s afterwards. |
 | **Unlock** | Clears a GRBL alarm (`$X`). |
 | Progress bar | Shows processing progress in %. |
+| **📌 Relative mode** (toggle) | Lasers the job **relative to the current, manually positioned laser head** instead of at absolute coordinates (see below). |
+
+#### 4.2.1 📌 Relative Mode
+
+Instead of lasering an object at fixed machine coordinates, the job can be lasered **relative** to the spot you have just moved the laser head to. Ideal for placing a motif precisely onto a workpiece that is already in place.
+
+1. **Turn on the "Relative mode" toggle.**
+2. **📌 Set reference point:** click in the work area — the cursor **snaps magnetically to corners** (or click freely). An **orange diamond marker** shows the point; its value appears in the status line. *Without* a reference point, "Run Job" refuses to start.
+3. **🔦 Pointer laser** (optional): turn on the laser at **minimal power** as a visible dot and move the head manually to where the reference point should sit. The pointer laser turns off automatically **on the next click** or **after 2 minutes**.
+4. **▶ Run Job** — the object is lasered so that the reference point lands **exactly at the current head position**.
+
+> ⚙️ **Technical:** in relative mode the reference point becomes the coordinate origin; the backend emits `G92 X0 Y0` at the start (current position = 0/0) and `G92.1` at the end (clear the offset). Your normal zero (`X0/Y0` button, `G10 L20`) stays **untouched**.
+>
+> 🔦 **Pointer laser:** with laser mode active (`$32=1`) the laser will not fire while stationary — therefore `$32` is briefly set to `0` and restored on switch-off. Power ≈ 1 % of `$30`.
 
 ### 4.3 🕹️ Control & Console
 
@@ -140,6 +155,7 @@ The canvas shows a **mm grid** with rulers. The top bar contains:
 
 | Element | Function |
 |---|---|
+| **📐 Width × Height + ✔️** | Set the **work-area size** in mm (button `✔️` applies it) — moved here from the machine panel |
 | 🌐 language dropdown | German / English / Spanish / Chinese (see [Multi-language](#14-multi-language)) |
 | **⛶** | Fit all objects (zoom to content) |
 | **🔲** | Center on the work area |
@@ -148,6 +164,8 @@ The canvas shows a **mm grid** with rulers. The top bar contains:
 | **📍** | Set the origin by clicking |
 
 **Navigation:** mouse wheel = zoom, mouse drag = select/move. The purple marker 📍 shows the origin, the red crosshair the current laser position.
+
+> ⚠️ **Laser-radiation warning:** while a job is running (or the pointer laser is active) a clearly visible warning floats over the top of the workspace.
 
 <img width="1489" height="46" alt="image" src="https://github.com/user-attachments/assets/f34e3e27-8aad-4c5f-ad5d-6429de5869e0" />
 <img width="1486" height="110" alt="image" src="https://github.com/user-attachments/assets/4f40818b-ff59-415b-b4c6-085e59f5ed55" />
@@ -160,13 +178,15 @@ The canvas shows a **mm grid** with rulers. The top bar contains:
 
 <img width="320" height="338" alt="image" src="https://github.com/user-attachments/assets/74f286c7-d6c7-4c30-8da9-eb9b644d8344" />
 
-The tools are grouped into labeled rows:
+The tools are grouped into labeled rows (all icons are monochrome/single-color):
 
 | Row | Buttons | Function |
 |---|---|---|
-| **Draw** | ▭ ◯ ✒️ T ⭐ | Rectangle, circle, polyline, text, shape library |
-| **Generators / Grouping** | 📦 ▦ │ 🔗 ⛓️‍💥 | Box generator, grid copy │ group, ungroup |
+| **Draw** | ⬉ │ ▭ ◯ ∠ T ★ | **Select/move** │ rectangle, circle, polyline, text, shape library |
+| **Generators / Grouping** | ▣ ▦ │ ⛓ ⛓̸ | Box generator, grid copy │ group, ungroup |
 | **Align** | ⇤ ↔ ⇥ │ ⤒ ↕ ⤓ | Left, center horizontally, right │ top, center vertically, bottom |
+
+**Pointer vs. draw mode:** the **⬉ Select tool** is the default mode for selecting objects and moving vertices. **∠ Polyline** switches to draw mode. The **currently active tool is highlighted** in the toolbar (blue border/background). In draw mode objects are not "grabbed", so a polyline can be started **directly on another line or corner**. ESC or a click on **⬉** ends draw mode.
 
 ### 6.2 📥 Import
 
@@ -206,10 +226,11 @@ Creates a rectangle or circle on the canvas. Size and position are then changed 
 
 ### 7.2 ✒️ Polyline
 
-Click points one after another to draw a polyline. **ESC** finishes.
+Click points one after another to draw a polyline. **ESC** finishes. Even the **first point** snaps magnetically to other objects/corners, and the polyline can be **started directly on another line** (see pointer/draw mode in [6.1](#61--tools)).
 
 - **Angle snapping:** snaps to 45° steps when close.
 - **Magnet snapping:** near other objects the cursor snaps to endpoints (strong, cyan), intersections (green) or edges (weak, orange). Hold **Alt** to temporarily disable the magnet.
+- **Alignment-line snap:** hovering over a corner remembers it as a reference. When you then place a point in its horizontal or vertical **alignment**, that axis snaps and a **light-blue dashed guide line** shows the alignment. It disappears when you leave the alignment zone.
 - **Live dimensions while drawing:** while placing a line's end point, a small label at the cursor shows **length (mm) and angle**. For the **first** segment the angle is **relative to the work-area Y axis** (0° = up, 90° = right); for every **further** segment the **interior angle to the previous line** (180° = straight on, 90° = right angle).
 - **Editing:** *single click* on a segment/handle selects it individually (length editable via dimension label, vertex movable via handle). *Double click* selects the **entire** polyline for move/rotate/scale. The vertex handles are drawn as small, unfilled squares.
 - **Move vertices with magnet:** dragging a vertex also snaps magnetically — to other objects **and to the other vertices/edges of the same polyline**. While dragging, the label shows the length(s) of the affected segments live and (for a middle vertex) the angle between them.
@@ -223,7 +244,7 @@ Opens the text dialog. Enter text, font height and a **TTF/OTF font** (button "�
 
 <img width="405" height="415" alt="image" src="https://github.com/user-attachments/assets/158db16e-7675-4559-a180-93927951fb23" />
 
-### 7.4 ⭐ Shape Library
+### 7.4 ★ Shape Library
 
 14 parametric shapes: **star, heart, trapezoid, parallelogram, hexagon, pentagon, octagon, triangle, arrow, cross, barrel, gear, lightning, stadium**. Click a shape, enter parameters, *Insert*. The shape appears centered in the visible area and is immediately editable.
 
@@ -233,7 +254,7 @@ Opens the text dialog. Enter text, font height and a **TTF/OTF font** (button "�
 
 ## 8. Generators
 
-### 8.1 📦 Box Generator (Finger Joint)
+### 8.1 ▣ Box Generator (Finger Joint)
 
 Creates ready-to-cut parts for boxes with **finger/notch joints**.
 
@@ -265,7 +286,7 @@ Duplicates the current selection in a grid: columns/rows and X/Y spacing.
 
 ## 9. Edit & Arrange
 
-### 9.1 🔗 Group / ⛓️‍💥 Ungroup
+### 9.1 ⛓ Group / ⛓̸ Ungroup
 
 Combine multiple objects into a group or split them again. Overlapping shapes can be welded into a **compound path** on grouping (true holes via even-odd rule — e.g. for donut shapes).
 

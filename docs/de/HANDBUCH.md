@@ -103,7 +103,8 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 | **Modus** (WLAN) | **Auto-Erkennung** (empfohlen), **Telnet** (FluidNC, Port 23) oder **WebUI** (ESP3D / Grbl_ESP32). Bei „Auto" probiert der Server zuerst Telnet und fällt sonst auf WebUI zurück. |
 | **🔌 Verbinden / 🛑 Trennen** | Verbindung auf-/abbauen |
 | **📡 Daten** | Liest die Maschinen-Einstellungen via `$$` (z. B. Arbeitsbereichsgröße `$130/$131`, Max-Power `$30`, Lasermodus `$32`) und übernimmt sie automatisch |
-| **📐 Arbeitsbereich** | Breite/Höhe in mm — definiert die Zeichenfläche (Button `✔️` wendet die Größe an) |
+
+> 📐 **Arbeitsbereich-Größe:** Die Eingabefelder für Breite/Höhe (mm) befinden sich jetzt in der **oberen Leiste des Arbeitsbereichs** (siehe [Abschnitt 5](#5-arbeitsbereich-canvas)).
 
 > 🔎 **Firmware-Erkennung:** Beim Verbinden erkennt das System automatisch die Firmware (**FluidNC** bzw. **Grbl/Grbl_ESP32**) und die Transportart und meldet sie im Log (z. B. „Verbunden: FluidNC über Telnet"). FluidNC v4 über WLAN wird per **Telnet** angesprochen.
 
@@ -117,6 +118,20 @@ Die Oberfläche ist dreigeteilt: **linke Leiste** (Maschine/Steuerung), **Arbeit
 | **⏹ STOP / ABBRUCH** | Bricht den laufenden Job sofort ab (GRBL Soft-Reset). Pumpe läuft danach noch ca. 10 s nach. |
 | **Unlock** | Entsperrt einen GRBL-Alarm (`$X`). |
 | Fortschrittsbalken | Zeigt den Bearbeitungsfortschritt in %. |
+| **📌 Relativ-Modus** (Schalter) | Lasert den Job **relativ zur aktuellen, manuell angefahrenen Laserposition** statt an absoluten Koordinaten (siehe unten). |
+
+#### 4.2.1 📌 Relativ-Modus
+
+Statt das Objekt an festen Maschinenkoordinaten zu lasern, kann der Job **relativ** zu der Stelle gelasert werden, an die du den Laserkopf gerade gefahren hast. Ideal, um ein Motiv passgenau auf ein bereits liegendes Werkstück zu setzen.
+
+1. **Schalter „Relativ-Modus" einschalten.**
+2. **📌 Referenzpunkt setzen:** in den Arbeitsbereich klicken — der Cursor **rastet magnetisch auf Eckpunkte** ein (oder klicke frei). Ein **oranger Rauten-Marker** zeigt den Punkt; sein Wert erscheint im Status. *Ohne* Referenzpunkt verweigert „Job Lasern" den Start.
+3. **🔦 Pointer-Laser** (optional) einschalten, um den Laser mit **minimaler Leistung** als sichtbaren Punkt zu nutzen, und den Kopf manuell dorthin fahren, wo der Referenzpunkt liegen soll. Der Pointer-Laser geht **beim nächsten Klick** oder **nach 2 Minuten** automatisch wieder aus.
+4. **▶ Job Lasern** — das Objekt wird so gelasert, dass der Referenzpunkt **genau an der aktuellen Kopfposition** liegt.
+
+> ⚙️ **Technik:** Im Relativ-Modus wird der Referenzpunkt zum Koordinaten-Ursprung; das Backend setzt zu Beginn `G92 X0 Y0` (aktuelle Position = 0/0) und am Ende `G92.1` (Offset wieder aufheben). Die normale Nullung (`X0/Y0`-Button, `G10 L20`) bleibt davon **unberührt**.
+>
+> 🔦 **Pointer-Laser:** Bei aktivem Laser-Modus (`$32=1`) feuert der Laser im Stillstand nicht — daher wird `$32` kurz auf `0` gesetzt und beim Ausschalten wieder hergestellt. Leistung ≈ 1 % von `$30`.
 
 ### 4.3 🕹️ Steuerung & Konsole
 <img width="327" height="657" alt="image" src="https://github.com/user-attachments/assets/6494e2bf-0dc2-4da1-89fc-64ffde0e84df" />
@@ -140,6 +155,7 @@ Die Zeichenfläche zeigt ein **mm-Raster** mit Linealen. Die obere Leiste enthä
 
 | Element | Funktion |
 |---|---|
+| **📐 Breite × Höhe + ✔️** | **Arbeitsbereich-Größe** in mm festlegen (Button `✔️` wendet sie an) — aus dem Maschinen-Panel hierher verschoben |
 | 🌐 Sprach-Dropdown | Deutsch / English / Español / 中文 (siehe [Mehrsprachigkeit](#14-mehrsprachigkeit)) |
 | **⛶** | Alle Objekte einpassen (Zoom auf Inhalt) |
 | **🔲** | Auf den Arbeitsbereich zentrieren |
@@ -148,6 +164,8 @@ Die Zeichenfläche zeigt ein **mm-Raster** mit Linealen. Die obere Leiste enthä
 | **📍** | Nullpunkt (Ursprung) per Klick setzen |
 
 **Navigation:** Mausrad = Zoom, Ziehen mit der Maus = Auswahl/Verschieben. Der violette Marker 📍 zeigt den Nullpunkt, das rote Fadenkreuz die aktuelle Laserposition.
+
+> ⚠️ **Laserstrahlung-Warnung:** Während eines laufenden Jobs (oder bei aktivem Pointer-Laser) schwebt ein gut sichtbarer Warnhinweis oben über dem Arbeitsbereich.
 <img width="1044" height="57" alt="image" src="https://github.com/user-attachments/assets/d58f7cf0-a1eb-42ed-b609-addc9ed1dcae" />
 
 <img width="1019" height="107" alt="image" src="https://github.com/user-attachments/assets/d5d7e7a7-68d2-4152-915e-f69dbaddaa87" />
@@ -160,13 +178,15 @@ Die Zeichenfläche zeigt ein **mm-Raster** mit Linealen. Die obere Leiste enthä
 
 <img width="322" height="341" alt="image" src="https://github.com/user-attachments/assets/9ed21025-d370-4a4b-89e4-d6522415715b" />
 
-Die Werkzeuge sind in beschriftete Zeilen gruppiert:
+Die Werkzeuge sind in beschriftete Zeilen gruppiert (alle Symbole einfarbig/monochrom):
 
 | Zeile | Buttons | Funktion |
 |---|---|---|
-| **Zeichnen** | ▭ ◯ ✒️ T ⭐ | Rechteck, Kreis, Linienzug, Text, Formen-Bibliothek |
-| **Generatoren / Gruppieren** | 📦 ▦ │ 🔗 ⛓️‍💥 | Box-Generator, Raster-Kopie │ Gruppieren, Gruppierung aufheben |
+| **Zeichnen** | ⬉ │ ▭ ◯ ∠ T ★ | **Auswählen/Verschieben** │ Rechteck, Kreis, Linienzug, Text, Formen-Bibliothek |
+| **Generatoren / Gruppieren** | ▣ ▦ │ ⛓ ⛓̸ | Box-Generator, Raster-Kopie │ Gruppieren, Gruppierung aufheben |
 | **Ausrichten** | ⇤ ↔ ⇥ │ ⤒ ↕ ⤓ | Links, horizontal zentrieren, rechts │ oben, vertikal zentrieren, unten |
+
+**Zeiger- vs. Zeichenmodus:** Das **⬉ Auswählen-Werkzeug** ist der Standard-Modus zum Markieren von Objekten und Verschieben von Eckpunkten. Mit **∠ Linienzug** wechselt man in den Zeichenmodus. Das **aktuell aktive Werkzeug ist in der Leiste hervorgehoben** (blauer Rahmen/Hintergrund). Im Zeichenmodus werden Objekte nicht „angegriffen" — so kann ein Linienzug auch **direkt auf einer anderen Linie oder Ecke** gestartet werden. ESC oder ein Klick auf **⬉** beendet den Zeichenmodus.
 
 ### 6.2 📥 Importieren
 
@@ -206,10 +226,11 @@ Erzeugt ein Rechteck bzw. einen Kreis im Arbeitsbereich. Größe und Position we
 
 ### 7.2 ✒️ Linienzug (Polylinie)
 
-Klicke nacheinander Punkte, um einen Linienzug zu zeichnen. **ESC** beendet das Zeichnen.
+Klicke nacheinander Punkte, um einen Linienzug zu zeichnen. **ESC** beendet das Zeichnen. Schon der **erste Punkt** rastet magnetisch an anderen Objekten/Ecken ein, und der Linienzug lässt sich **direkt auf einer anderen Linie starten** (siehe Zeiger-/Zeichenmodus in [6.1](#61--werkzeuge)).
 
 - **Winkel-Snapping:** In der Nähe von 45°-Schritten rastet die Linie ein.
 - **Magnet-Snapping:** In der Nähe anderer Objekte rastet der Cursor auf Endpunkte (stark, cyan), Kreuzungen (grün) oder Kanten (schwach, orange) ein. **Alt** gedrückt halten deaktiviert den Magneten kurzzeitig.
+- **Fluchtlinien-Snap:** Fährst du mit der Maus über einen Eckpunkt, wird dieser als Referenz gemerkt. Setzt du danach einen Punkt in dessen waagerechter oder senkrechter **Flucht**, rastet die passende Achse ein und eine **hellblaue gestrichelte Hilfslinie** zeigt die Ausrichtung. Beim Verlassen des Fluchtbereichs verschwindet sie wieder.
 - **Live-Maße beim Zeichnen:** Während du den Endpunkt einer Linie setzt, zeigt ein kleines Label am Cursor **Länge (mm) und Winkel**. Beim **ersten** Segment der Winkel **zur Y-Achse des Arbeitsbereichs** (0° = nach oben, 90° = rechts), bei jedem **weiteren** Segment der **Innenwinkel zur vorherigen Linie** (180° = gerade weiter, 90° = rechter Winkel).
 - **Bearbeiten:** *Einfachklick* auf ein Segment/Handle wählt es einzeln (Länge per Maßzahl änderbar, Eckpunkt per Handle verschiebbar). *Doppelklick* wählt den **gesamten** Linienzug zum Verschieben/Drehen/Skalieren. Die Eckpunkt-Handles werden als kleine, ungefüllte Quadrate dargestellt.
 - **Eckpunkte verschieben mit Magnet:** Beim Ziehen eines Eckpunkts rastet dieser ebenfalls magnetisch ein — auf andere Objekte **und auf die anderen Eckpunkte/Kanten der eigenen Polylinie**. Dabei zeigt das Label live die Länge(n) der betroffenen Segmente und (bei einem Mittelpunkt) den Winkel zwischen ihnen.
@@ -223,7 +244,7 @@ Klicke nacheinander Punkte, um einen Linienzug zu zeichnen. **ESC** beendet das 
 
 <img width="408" height="416" alt="image" src="https://github.com/user-attachments/assets/6e91009e-891e-4cf0-9d01-7011c933b598" />
 
-### 7.4 ⭐ Formen-Bibliothek
+### 7.4 ★ Formen-Bibliothek
 
 14 parametrische Formen: **Stern, Herz, Trapez, Parallelogramm, Sechseck, Fünfeck, Achteck, Dreieck, Pfeil, Kreuz, Tonne, Zahnrad, Blitz, Stadion**. Form anklicken, Parameter eingeben, *Einfügen*. Die Form landet mittig im sichtbaren Bereich und ist sofort bearbeitbar.
 
@@ -233,7 +254,7 @@ Klicke nacheinander Punkte, um einen Linienzug zu zeichnen. **ESC** beendet das 
 
 ## 8. Generatoren
 
-### 8.1 📦 Box-Generator (Finger-Joint)
+### 8.1 ▣ Box-Generator (Finger-Joint)
 
 Erzeugt fertige Schnittteile für Kästen mit **Finger-/Kerbverbindungen**.
 
@@ -265,7 +286,7 @@ Dupliziert die aktuelle Auswahl in einem Raster: Spalten/Zeilen und Abstände in
 
 ## 9. Bearbeiten & Anordnen
 
-### 9.1 🔗 Gruppieren / ⛓️‍💥 Aufheben
+### 9.1 ⛓ Gruppieren / ⛓̸ Aufheben
 
 Mehrere Objekte zu einer Gruppe zusammenfassen bzw. wieder trennen. Überlappende Formen können beim Gruppieren zu einem **Verbundpfad** verschweißt werden (echte Löcher per Even-Odd-Regel — z. B. für Donut-Formen).
 
