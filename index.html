@@ -67,6 +67,20 @@
         .panel.collapsed { flex-grow: 0 !important; }
         .panel-arrow { color: #888; font-size: 12px; }
 
+        /* Schiebeschalter (Toggle) */
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; flex: 0 0 auto; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider {
+            position: absolute; inset: 0; cursor: pointer;
+            background: #555; border-radius: 22px; transition: background .2s;
+        }
+        .switch .slider::before {
+            content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px;
+            background: #fff; border-radius: 50%; transition: transform .2s;
+        }
+        .switch input:checked + .slider { background: #e67e22; }
+        .switch input:checked + .slider::before { transform: translateX(18px); }
+
         /* Runde Industrie-Taster (Start / Not-Aus) */
         .btn-round {
             width: 104px;
@@ -176,14 +190,15 @@
             font-size: 12px; 
         }
         
-        .workspace-container { 
-            flex-grow: 1; 
-            background: #2d2d2d; 
-            border-radius: 8px; 
-            padding: 15px; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
+        .workspace-container {
+            flex-grow: 1;
+            background: #2d2d2d;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;   /* Anker für den schwebenden Laser-Warnhinweis */
         }
         
         /* Grid-Layout für Canvas + Lineale */
@@ -248,6 +263,18 @@
             gap: 8px;
             justify-content: center;
             margin-bottom: 10px;
+        }
+        /* Kettensymbole monochrom erzwingen (Symbol-Font statt Emoji-Font) */
+        .icon-btn.mono {
+            font-family: "Segoe UI Symbol", "Segoe UI", sans-serif;
+            font-variant-emoji: text;
+        }
+        /* Aktuell aktives Werkzeug in der Werkzeugleiste hervorheben */
+        .icon-btn.tool-active {
+            background: #007acc !important;
+            border: 1px solid #4db3ff !important;
+            box-shadow: 0 0 0 2px rgba(0,122,204,0.55);
+            color: #fff;
         }
 
         /* Schwebende Bemaßungs-Eingabefelder */
@@ -316,22 +343,6 @@
                 <button id="btnLoadData" onclick="loadMachineData()" data-i18n="machine.data" data-i18n-title="machine.dataTip" title="Lese Daten ($$)" style="flex: 1; padding: 8px 2px; font-size: 12px; background: #27ae60; opacity: 0.3;" disabled>📡 Daten</button>
             </div>
 
-            <hr style="border-color: #444; margin: 15px 0 10px 0;">
-
-            <!-- Arbeitsbereich kompakt nebeneinander -->
-            <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px;" data-i18n="machine.workarea">📐 Arbeitsbereich</div>
-            <div style="display: flex; gap: 8px; align-items: flex-end;">
-                <div style="flex: 1;">
-                    <label style="font-size: 11px; color: #aaa;" data-i18n="machine.width">Breite (X mm)</label>
-                    <input type="number" id="wsWidthInput" value="400" style="margin: 0; margin-top: 2px;">
-                </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 11px; color: #aaa;" data-i18n="machine.height">Höhe (Y mm)</label>
-                    <input type="number" id="wsHeightInput" value="400" style="margin: 0; margin-top: 2px;">
-                </div>
-                <!-- Der OK-Knopf sitzt jetzt direkt hinter den Feldern -->
-                <button onclick="updateWorkspaceSize()" data-i18n-title="machine.applySize" style="margin: 0; padding: 8px; flex-shrink: 0; width: 45px; background: #3498db;" title="Größe anwenden">✔️</button>
-            </div>
         </div>
 
         <div class="panel">
@@ -354,6 +365,26 @@
                 <!-- Not-Aus: Durchmesser = Höhe (Start 80 + Abstand 6 + Unlock 42) -->
                 <button class="btn-round btn-estop" onclick="abortJob()" data-i18n-title="job.stop" title="STOP / Abbruch"
                         style="width: 128px; height: 128px;">STOP</button>
+            </div>
+
+            <!-- Relativ-Modus: Job relativ zur aktuellen, manuell angefahrenen Laserposition -->
+            <div style="margin-top: 22px; padding: 10px; border: 1px solid #444; border-radius: 6px; background: #2a2a2a;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; margin: 0;">
+                    <span class="switch">
+                        <input type="checkbox" id="relativeModeToggle" onchange="toggleRelativeMode()">
+                        <span class="slider"></span>
+                    </span>
+                    <span data-i18n="job.relMode">📌 Relativ-Modus</span>
+                </label>
+                <div id="relativeModeControls" style="display: none; margin-top: 8px;">
+                    <button onclick="activateRefPointMode()" data-i18n="job.setRef" style="width: 100%; background: #e67e22; font-size: 12px;">📌 Referenzpunkt setzen</button>
+                    <div style="font-size: 12px; margin-top: 6px; color: #ccc;">
+                        <span data-i18n="job.refPoint">Referenzpunkt</span>: <span id="refPointStatus" style="color: #e67e22; font-weight: bold;">–</span>
+                    </div>
+                    <button id="pointerLaserBtn" onclick="setPointerLaser(!_pointerLaserOn)" style="width: 100%; margin-top: 8px; background: #c0392b; font-size: 12px;">🔦 Pointer-Laser EIN</button>
+                    <div style="font-size: 11px; margin-top: 4px; color: #888;" data-i18n="job.pointerHint">Laser mit minimaler Leistung zum Positionieren. Geht beim nächsten Klick oder nach 2 Min automatisch aus.</div>
+                    <div style="font-size: 11px; margin-top: 4px; color: #888;" data-i18n="job.relInfo">Laser manuell positionieren → Job wird relativ zum Referenzpunkt gelasert.</div>
+                </div>
             </div>
         </div>
 
@@ -382,12 +413,17 @@
 
     <div class="workspace-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3 style="margin: 0;" data-i18n="ws.title">Arbeitsbereich</h3>
-            <!-- Laserstrahlung-Warnung (nur während eines laufenden Jobs sichtbar) -->
-            <span id="laserWarning" style="display:none; align-items:center; gap:8px; background:#1a1a1a; border:2px solid #f1c40f; color:#f1c40f; font-weight:bold; padding:4px 14px; border-radius:6px; font-size:14px; box-shadow:0 0 12px rgba(241,196,15,0.5);">
-                <span style="font-size:20px;">⚠️</span>
-                <span data-i18n="ws.laserWarning">LASERSTRAHLUNG – nicht in den Strahl blicken</span>
-            </span>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h3 style="margin: 0;" data-i18n="ws.title">Arbeitsbereich</h3>
+                <!-- Abmessungen des Arbeitsbereichs (mm) – aus dem Maschinen-Panel hierher verschoben -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 15px;" data-i18n-title="machine.workarea" title="📐 Arbeitsbereich">📐</span>
+                    <input type="number" id="wsWidthInput" value="400" data-i18n-title="machine.width" title="Breite (X mm)" style="width: 56px; margin: 0; padding: 4px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 13px;">
+                    <span style="color: #888;">×</span>
+                    <input type="number" id="wsHeightInput" value="400" data-i18n-title="machine.height" title="Höhe (Y mm)" style="width: 56px; margin: 0; padding: 4px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 13px;">
+                    <button onclick="updateWorkspaceSize()" class="icon-btn" data-i18n-title="machine.applySize" title="Größe anwenden" style="width: 32px; height: 32px; font-size: 14px; background: #3498db;">✔️</button>
+                </div>
+            </div>
             <div class="row" style="margin: 0; width: auto; gap: 8px; align-items: center;">
                 <select id="langSelect" onchange="setLanguage(this.value)" title="Sprache / Language"
                         style="width: auto; margin: 0; padding: 4px 6px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 13px;">
@@ -405,7 +441,13 @@
                 <button onclick="activateOriginMode()" data-i18n-title="ws.setOrigin" title="Nullpunkt hier setzen" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #9b59b6;">📍</button>
             </div>
         </div>
-        
+
+        <!-- Laserstrahlung-Warnung: schwebt während eines laufenden Jobs über dem Arbeitsbereich -->
+        <div id="laserWarning" style="display:none; position:absolute; top:58px; left:50%; transform:translateX(-50%); z-index:1500; pointer-events:none; align-items:center; gap:10px; background:rgba(20,20,20,0.95); border:2px solid #f1c40f; color:#f1c40f; font-weight:bold; padding:8px 18px; border-radius:8px; font-size:15px; box-shadow:0 4px 18px rgba(241,196,15,0.6);">
+            <span style="font-size:22px;">⚠️</span>
+            <span data-i18n="ws.laserWarning">LASERSTRAHLUNG – nicht in den Strahl blicken</span>
+        </div>
+
         <div class="ruler-layout">
             <div class="ruler-corner"></div>
             <canvas id="rulerX"></canvas>
@@ -458,21 +500,23 @@
             <!-- 1. Zeile: Zeichnen -->
             <div style="font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 3px 2px;" data-i18n="tools.draw">Zeichnen</div>
             <div class="tool-row" style="margin-bottom: 8px;">
+                <button class="icon-btn tool-active" id="toolSelect" onclick="activateSelectTool()" data-i18n-title="tools.select" title="Auswählen / Verschieben">⬉</button>
+                <div style="border-left: 1px solid #555; margin: 0 2px;"></div>
                 <button class="icon-btn" onclick="addRect()" data-i18n-title="tools.rect" title="Rechteck zeichnen">▭</button>
                 <button class="icon-btn" onclick="addCircle()" data-i18n-title="tools.circle" title="Kreis zeichnen">◯</button>
-                <button class="icon-btn" onclick="startPolylineMode()" data-i18n-title="tools.polyline" title="Linienzug zeichnen (ESC zum Beenden)">✒️</button>
+                <button class="icon-btn" id="toolPolyline" onclick="startPolylineMode()" data-i18n-title="tools.polyline" title="Linienzug zeichnen (ESC zum Beenden)">∠</button>
                 <button class="icon-btn" onclick="addText()" data-i18n-title="tools.text" title="Text hinzufügen">T</button>
-                <button class="icon-btn" onclick="openShapeLibrary()" data-i18n-title="tools.shapes" title="Formen-Bibliothek">⭐</button>
+                <button class="icon-btn" onclick="openShapeLibrary()" data-i18n-title="tools.shapes" title="Formen-Bibliothek">★</button>
             </div>
 
             <!-- 2. Zeile: Generatoren / Kopie | Gruppieren / Zerlegen -->
             <div style="font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 3px 2px;" data-i18n="tools.genGroup">Generatoren / Gruppieren</div>
             <div class="tool-row" style="margin-bottom: 8px;">
-                <button class="icon-btn" onclick="openBoxDialog()" data-i18n-title="tools.box" title="Box-Generator (Finger-Joint)">📦</button>
+                <button class="icon-btn" onclick="openBoxDialog()" data-i18n-title="tools.box" title="Box-Generator (Finger-Joint)">▣</button>
                 <button class="icon-btn" onclick="openArrayDialog()" data-i18n-title="tools.array" title="Raster-Kopie (Array)">▦</button>
                 <div style="border-left: 1px solid #555; margin: 0 4px;"></div>
-                <button class="icon-btn" onclick="groupSelection()" data-i18n-title="tools.group" title="Auswahl gruppieren (🔗)">🔗</button>
-                <button class="icon-btn" onclick="ungroupSelection()" data-i18n-title="tools.ungroup" title="Gruppierung aufheben">⛓️‍💥</button>
+                <button class="icon-btn mono" onclick="groupSelection()" data-i18n-title="tools.group" title="Auswahl gruppieren">⛓</button>
+                <button class="icon-btn mono" onclick="ungroupSelection()" data-i18n-title="tools.ungroup" title="Gruppierung aufheben">⛓̸</button>
             </div>
 
             <!-- 3. Zeile: Ausrichten (erstes gewähltes Objekt = Referenz) -->
@@ -1364,7 +1408,15 @@
             new fabric.Line([0, -12, 0, 12], { stroke: '#9b59b6', strokeWidth: 2 })
         ], { left: 0, top: workspaceHeight, originX: 'center', originY: 'center', selectable: true, hasControls: false, excludeFromExport: true });
 
-        canvas.add(workspaceRect, crosshair, mouseHLine, mouseVLine, originMarker);
+        // Referenzpunkt-Marker für den Relativ-Modus (orange Raute + Fadenkreuz)
+        // Alle Teile exakt um (0,0) zentriert, damit der Marker genau auf dem Klickpunkt sitzt.
+        let refPointMarker = new fabric.Group([
+            new fabric.Rect({ width: 8, height: 8, angle: 45, stroke: '#e67e22', strokeWidth: 1.5, fill: 'transparent', left: 0, top: 0, originX: 'center', originY: 'center' }),
+            new fabric.Line([-7, 0, 7, 0], { stroke: '#e67e22', strokeWidth: 1.5 }),
+            new fabric.Line([0, -7, 0, 7], { stroke: '#e67e22', strokeWidth: 1.5 })
+        ], { left: 0, top: 0, originX: 'center', originY: 'center', selectable: false, evented: false, excludeFromExport: true, visible: false });
+
+        canvas.add(workspaceRect, crosshair, mouseHLine, mouseVLine, originMarker, refPointMarker);
         window.addEventListener('contextmenu', e => { if(e.target.closest('.ruler-layout')) e.preventDefault(); });
 
         let lastLaserX = 0, lastLaserY = 0;
@@ -1398,7 +1450,15 @@
 
         let isSettingOrigin = false;
         let isMovingLaser = false; // NEU: Status für das Positionieren
-        
+        let relativeMode = false;       // Relativ-Modus (Job relativ zur aktuellen Laserposition)
+        let isSettingRefPoint = false;  // Klick setzt gerade den Referenzpunkt
+        let refPoint = null;            // {x,y} Canvas-Koordinaten des Referenzpunkts oder null
+        let _jobRunning = false;        // läuft gerade ein Laser-Job?
+        let _pointerLaserOn = false;    // Positionier-Laser (minimale Leistung) aktiv?
+        let _pointerLaserTimer = null;  // Auto-Aus-Timer
+        let _laserModeValue = 1;        // zuletzt gelesener $32-Wert (Laser-Modus); 1 = an
+        const POINTER_LASER_PERCENT = 1;// minimale Leistung in % von $30 zum Positionieren
+
         // =========================================================
         // MASTER MAUS-KLICK EVENT (Steuert alle Werkzeuge konfliktfrei)
         // =========================================================
@@ -1478,11 +1538,21 @@
                     let snap = getMagnetSnap({ x: this.left, y: this.top });
                     _snapExcludeHandles = null;
                     _snapExcludeSegments = null;
+                    if (snap && snap.type === 'endpoint') _alignRef = { x: snap.x, y: snap.y };
                     if (snap) {
                         this.set({ left: snap.x, top: snap.y });
                         _showSnap(snap.x, snap.y, snap.type);
+                        _hideAlignGuides();
                     } else {
                         _hideSnap();
+                        // Fluchtlinien-Snap zum zuletzt überfahrenen Eckpunkt
+                        let al = getAlignSnap({ x: this.left, y: this.top });
+                        if (al) {
+                            this.set({ left: al.x, top: al.y });
+                            _showAlignGuide(al);
+                        } else {
+                            _hideAlignGuides();
+                        }
                     }
 
                     // Aktuelle (ggf. eingerastete) Handle-Position in die Kette übernehmen
@@ -1618,7 +1688,19 @@
                 document.getElementById('workspaceCanvas').style.cursor = 'default';
                 logMessage("SYSTEM", `G-Code Nullpunkt gesetzt bei X: ${pointer.x.toFixed(2)} Y: ${(workspaceHeight - pointer.y).toFixed(2)}`, "#9b59b6");
                 canvas.requestRenderAll();
-                
+
+            // 4b. REFERENZPUNKT SETZEN (Relativ-Modus) – mit Magnet-Snap auf Eckpunkte
+            } else if (isSettingRefPoint) {
+                let pointer = canvas.getPointer(opt.e);
+                let snap = getMagnetSnap(pointer);   // Eckpunkt einrasten, sonst freier Punkt
+                let px = snap ? snap.x : pointer.x;
+                let py = snap ? snap.y : pointer.y;
+                setRefPoint(px, py);
+                isSettingRefPoint = false;
+                _hideSnap();
+                document.getElementById('workspaceCanvas').style.cursor = 'default';
+                canvas.requestRenderAll();
+
             // 5. ANSICHT VERSCHIEBEN (Rechtsklick / Panning)
             } else if (isRightClick) {
                 this.isDragging = true; 
@@ -1639,6 +1721,12 @@
 
             document.getElementById('mousePosX').innerText = pointer.x.toFixed(2);
             document.getElementById('mousePosY').innerText = userY.toFixed(2);
+
+            // Beim Setzen des Referenzpunkts: Magnet-Vorschau auf Eckpunkte
+            if (isSettingRefPoint) {
+                let s = getMagnetSnap(pointer);
+                if (s) _showSnap(s.x, s.y, s.type); else _hideSnap();
+            }
 
             if (this.isDragging) {
                 var e = opt.e; var vpt = this.viewportTransform;
@@ -1667,6 +1755,7 @@
             mouseHLine.set('strokeWidth', strokeW);
             mouseVLine.set('strokeWidth', strokeW);
             originMarker.getObjects().forEach(o => o.set('strokeWidth', 2 * strokeW));
+            if (refPointMarker) refPointMarker.getObjects().forEach(o => o.set('strokeWidth', 1.5 * strokeW));
         }
 
         function activateOriginMode() {
@@ -1679,9 +1768,101 @@
         function activateMoveMode() {
             isMovingLaser = true;
             isSettingOrigin = false;
+            isSettingRefPoint = false;
             document.getElementById('workspaceCanvas').style.cursor = 'crosshair';
             logMessage("SYSTEM", "Klicke auf den Arbeitsbereich, um den Laser dorthin zu bewegen.", "#e74c3c");
         }
+
+        // --- RELATIV-MODUS (Job relativ zur aktuellen, manuell angefahrenen Laserposition) ---
+        function toggleRelativeMode() {
+            relativeMode = document.getElementById('relativeModeToggle').checked;
+            document.getElementById('relativeModeControls').style.display = relativeMode ? 'block' : 'none';
+            refPointMarker.set({ visible: relativeMode && !!refPoint });
+            if (relativeMode) {
+                logMessage("SYSTEM", t('job.relOn'), "#e67e22");
+                if (!refPoint) activateRefPointMode();   // ohne Referenzpunkt direkt zum Setzen auffordern
+            } else {
+                if (isSettingRefPoint) { isSettingRefPoint = false; document.getElementById('workspaceCanvas').style.cursor = 'default'; }
+                if (_pointerLaserOn) setPointerLaser(false);   // Positionier-Laser sicher ausschalten
+                logMessage("SYSTEM", t('job.relOff'), "#888");
+            }
+            canvas.requestRenderAll();
+        }
+
+        function activateRefPointMode() {
+            isSettingRefPoint = true;
+            isSettingOrigin = false;
+            isMovingLaser = false;
+            document.getElementById('workspaceCanvas').style.cursor = 'crosshair';
+            logMessage("SYSTEM", t('job.refHint'), "#e67e22");
+        }
+
+        function setRefPoint(x, y) {
+            refPoint = { x: x, y: y };
+            refPointMarker.set({ left: x, top: y, visible: true });
+            refPointMarker.setCoords();
+            refPointMarker.bringToFront();
+            updateRefPointStatus();
+            logMessage("SYSTEM", `${t('job.refSet')} X: ${x.toFixed(2)} Y: ${(workspaceHeight - y).toFixed(2)}`, "#e67e22");
+        }
+
+        function updateRefPointStatus() {
+            let el = document.getElementById('refPointStatus');
+            if (!el) return;
+            if (refPoint) {
+                el.textContent = `X: ${refPoint.x.toFixed(1)}  Y: ${(workspaceHeight - refPoint.y).toFixed(1)} mm`;
+                el.style.color = '#2ecc71';
+            } else {
+                el.textContent = t('job.refNone');
+                el.style.color = '#e67e22';
+            }
+        }
+
+        // --- Positionier-Laser (minimale Leistung) ---
+        function _sendGcodeRaw(cmd) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: "send_gcode", command: cmd }));
+            }
+        }
+        function setPointerLaser(on) {
+            if (on) {
+                if (!ws || ws.readyState !== WebSocket.OPEN) { alert("Keine Verbindung zum Agenten!"); return; }
+                _pointerLaserOn = true;
+                // Minimale, aber sichtbare Leistung (in % von $30)
+                let maxPwr = parseFloat(document.getElementById('powerInput').max) || 1000;
+                let s = Math.max(1, Math.round(maxPwr * POINTER_LASER_PERCENT / 100));
+                // Laser-Modus kurz deaktivieren, sonst feuert der Laser im Stillstand NICHT
+                _sendGcodeRaw("$32=0");
+                _sendGcodeRaw(`M3 S${s}`);
+                logMessage("USER", `$32=0 / M3 S${s} (${t('job.pointerOnLog')})`, "#e67e22");
+                showLaserWarning();
+                if (_pointerLaserTimer) clearTimeout(_pointerLaserTimer);
+                _pointerLaserTimer = setTimeout(() => setPointerLaser(false), 120000); // 2 Minuten Auto-Aus
+            } else {
+                if (!_pointerLaserOn) return;
+                _pointerLaserOn = false;
+                if (_pointerLaserTimer) { clearTimeout(_pointerLaserTimer); _pointerLaserTimer = null; }
+                _sendGcodeRaw("M5");
+                _sendGcodeRaw(`$32=${_laserModeValue}`);   // Laser-Modus wiederherstellen
+                logMessage("USER", `M5 / $32=${_laserModeValue} (${t('job.pointerOffLog')})`, "#888");
+                if (!_jobRunning) hideLaserWarning();   // Warnung nur ausblenden, wenn kein Job läuft
+            }
+            updatePointerLaserBtn();
+        }
+
+        function updatePointerLaserBtn() {
+            let b = document.getElementById('pointerLaserBtn');
+            if (!b) return;
+            b.textContent = _pointerLaserOn ? t('job.pointerStop') : t('job.pointerStart');
+            b.style.background = _pointerLaserOn ? '#e67e22' : '#c0392b';
+        }
+
+        // Positionier-Laser ausschalten, sobald irgendwo anders geklickt wird
+        document.addEventListener('mousedown', function(e) {
+            if (_pointerLaserOn && !(e.target.closest && e.target.closest('#pointerLaserBtn'))) {
+                setPointerLaser(false);
+            }
+        }, true);
 
         // Schaltet die UI-Elemente je nach Verbindungsstatus um
         function setMachineConnectionState(isConnected) {
@@ -1790,8 +1971,8 @@
         // ==========================================
         // 4. CAD WERKZEUGE & IMPORTE
         // ==========================================
-        function addRect() { const rect = new fabric.Rect({ left: 50, top: 50, width: 100, height: 80, ...laserStyle }); canvas.add(rect); canvas.setActiveObject(rect); }
-        function addCircle() { const circle = new fabric.Circle({ left: 100, top: 100, radius: 50, ...laserStyle }); canvas.add(circle); canvas.setActiveObject(circle); }
+        function addRect() { if (isPolyMode) finishPolylineMode(); const rect = new fabric.Rect({ left: 50, top: 50, width: 100, height: 80, ...laserStyle }); canvas.add(rect); canvas.setActiveObject(rect); }
+        function addCircle() { if (isPolyMode) finishPolylineMode(); const circle = new fabric.Circle({ left: 100, top: 100, radius: 50, ...laserStyle }); canvas.add(circle); canvas.setActiveObject(circle); }
        
         function groupSelection() {
             if (!canvas.getActiveObject() || canvas.getActiveObject().type !== 'activeSelection') {
@@ -2277,6 +2458,7 @@
         // ==========================================
         // Öffnet jetzt den Konfigurator-Dialog
         function addText() {
+            if (isPolyMode) finishPolylineMode();
             document.getElementById('textDialog').style.display = 'block';
             document.getElementById('dialogTextInput').focus();
             document.getElementById('dialogTextInput').select();
@@ -2674,14 +2856,19 @@
                     let cy = bounds.top + bounds.height / 2;
                     chainPts.forEach(p => { p.y = cy + (p.y - cy) * scale; });
                 }
+                // WICHTIG: die activeSelection ZUERST auflösen. Sonst gehören die
+                // Liniensegmente noch zur Gruppe und updateLineForSVG setzt ihre
+                // Koordinaten gruppen-relativ → die Linien erscheinen versetzt
+                // (rechts unten), während die Handles korrekt sitzen.
+                canvas.discardActiveObject();
                 for (let i = 0; i < chainHandles.length; i++) {
                     chainHandles[i].set({ left: chainPts[i].x, top: chainPts[i].y }).setCoords();
                 }
                 for (let i = 0; i < chainLines.length; i++) {
                     updateLineForSVG(chainLines[i], chainPts[i].x, chainPts[i].y, chainPts[i+1].x, chainPts[i+1].y);
+                    chainLines[i].setCoords();
                 }
                 // activeSelection neu aufbauen, damit Bounding-Box stimmt
-                canvas.discardActiveObject();
                 let newSel = canvas.getObjects().filter(o => o.chainId === chainId && o.customType === 'polyLine');
                 if (newSel.length > 0) canvas.setActiveObject(new fabric.ActiveSelection(newSel, { canvas: canvas }));
             } else if (type === 'X') {
@@ -2932,6 +3119,7 @@
         let _currentShapeKey = null;
 
         function openShapeLibrary() {
+            if (isPolyMode) finishPolylineMode();
             // Shape-Grid befüllen
             let grid = document.getElementById('shapeGrid');
             grid.innerHTML = '';
@@ -4061,12 +4249,21 @@
                 'machine.width':'Breite (X mm)', 'machine.height':'Höhe (Y mm)', 'machine.applySize':'Größe anwenden',
                 'panel.job':'🎛️ Job Kontrolle', 'job.run':'▶ Job Lasern', 'job.runShort':'Job Lasern', 'job.stop':'⏹ STOP / ABBRUCH',
                 'job.unlock':'Unlock', 'job.unlockTip':'Alarm entsperren (Unlock $X)',
+                'job.relMode':'📌 Relativ-Modus', 'job.setRef':'📌 Referenzpunkt setzen', 'job.refPoint':'Referenzpunkt',
+                'job.relInfo':'Laser manuell positionieren → Job wird relativ zum Referenzpunkt gelasert.',
+                'job.refNone':'nicht gesetzt', 'job.refSet':'Referenzpunkt gesetzt bei',
+                'job.relOn':'Relativ-Modus AN: Job wird relativ zur aktuellen Laserposition gelasert. Referenzpunkt erforderlich.',
+                'job.relOff':'Relativ-Modus AUS.', 'job.refHint':'Klicke in den Arbeitsbereich, um den Referenzpunkt zu setzen (rastet auf Eckpunkte ein).',
+                'job.refMissing':'Relativ-Modus: Bitte zuerst einen Referenzpunkt setzen!',
+                'job.pointerStart':'🔦 Pointer-Laser EIN', 'job.pointerStop':'🔦 Pointer-Laser AUS',
+                'job.pointerHint':'Laser mit minimaler Leistung zum Positionieren. Geht beim nächsten Klick oder nach 2 Min automatisch aus.',
+                'job.pointerOnLog':'Pointer-Laser EIN, minimale Leistung', 'job.pointerOffLog':'Pointer-Laser AUS',
                 'panel.control':'🕹️ Steuerung & Konsole', 'ctrl.send':'Befehl senden', 'ctrl.histHint':'↑/↓ blättert durch den Befehlsverlauf', 'ctrl.home':'Home',
                 'ctrl.homeTip':'Referenzfahrt (Home $H)', 'ctrl.zeroTip':'Aktuelle Position als X0/Y0 festlegen',
                 'ctrl.pumpOn':'Pumpe EIN', 'ctrl.pumpOff':'Pumpe AUS', 'ctrl.pumpTip':'Pumpe umschalten (M8/M9)',
                 'ctrl.jog':'🎯 Grafischer Jog-Controller',
                 'panel.project':'💾 Projektverwaltung', 'project.save':'Projekt speichern (.json)', 'project.load':'Projekt laden',
-                'panel.tools':'🛠️ Werkzeuge', 'tools.draw':'Zeichnen', 'tools.rect':'Rechteck zeichnen',
+                'panel.tools':'🛠️ Werkzeuge', 'tools.draw':'Zeichnen', 'tools.select':'Auswählen / Verschieben', 'tools.rect':'Rechteck zeichnen',
                 'tools.circle':'Kreis zeichnen', 'tools.polyline':'Linienzug zeichnen (ESC zum Beenden)',
                 'tools.text':'Text hinzufügen', 'tools.shapes':'Formen-Bibliothek',
                 'tools.genGroup':'Generatoren / Gruppieren', 'tools.box':'Box-Generator (Finger-Joint)',
@@ -4094,12 +4291,21 @@
                 'machine.width':'Width (X mm)', 'machine.height':'Height (Y mm)', 'machine.applySize':'Apply size',
                 'panel.job':'🎛️ Job Control', 'job.run':'▶ Run Job', 'job.runShort':'Run Job', 'job.stop':'⏹ STOP / ABORT',
                 'job.unlock':'Unlock', 'job.unlockTip':'Clear alarm (Unlock $X)',
+                'job.relMode':'📌 Relative mode', 'job.setRef':'📌 Set reference point', 'job.refPoint':'Reference point',
+                'job.relInfo':'Position the laser manually → the job is lasered relative to the reference point.',
+                'job.refNone':'not set', 'job.refSet':'Reference point set at',
+                'job.relOn':'Relative mode ON: the job is lasered relative to the current laser position. Reference point required.',
+                'job.relOff':'Relative mode OFF.', 'job.refHint':'Click in the work area to set the reference point (snaps to corners).',
+                'job.refMissing':'Relative mode: please set a reference point first!',
+                'job.pointerStart':'🔦 Pointer laser ON', 'job.pointerStop':'🔦 Pointer laser OFF',
+                'job.pointerHint':'Laser at minimal power for positioning. Turns off on the next click or after 2 min.',
+                'job.pointerOnLog':'Pointer laser ON, minimal power', 'job.pointerOffLog':'Pointer laser OFF',
                 'panel.control':'🕹️ Control & Console', 'ctrl.send':'Send command', 'ctrl.histHint':'↑/↓ scrolls through command history', 'ctrl.home':'Home',
                 'ctrl.homeTip':'Homing cycle (Home $H)', 'ctrl.zeroTip':'Set current position as X0/Y0',
                 'ctrl.pumpOn':'Pump ON', 'ctrl.pumpOff':'Pump OFF', 'ctrl.pumpTip':'Toggle pump (M8/M9)',
                 'ctrl.jog':'🎯 Graphical Jog Controller',
                 'panel.project':'💾 Project', 'project.save':'Save project (.json)', 'project.load':'Load project',
-                'panel.tools':'🛠️ Tools', 'tools.draw':'Draw', 'tools.rect':'Draw rectangle',
+                'panel.tools':'🛠️ Tools', 'tools.draw':'Draw', 'tools.select':'Select / Move', 'tools.rect':'Draw rectangle',
                 'tools.circle':'Draw circle', 'tools.polyline':'Draw polyline (ESC to finish)',
                 'tools.text':'Add text', 'tools.shapes':'Shape library',
                 'tools.genGroup':'Generators / Grouping', 'tools.box':'Box generator (finger joint)',
@@ -4127,12 +4333,21 @@
                 'machine.width':'Ancho (X mm)', 'machine.height':'Alto (Y mm)', 'machine.applySize':'Aplicar tamaño',
                 'panel.job':'🎛️ Control de trabajo', 'job.run':'▶ Ejecutar', 'job.runShort':'Ejecutar', 'job.stop':'⏹ PARAR / ABORTAR',
                 'job.unlock':'Desbloquear', 'job.unlockTip':'Quitar alarma (Unlock $X)',
+                'job.relMode':'📌 Modo relativo', 'job.setRef':'📌 Definir punto de referencia', 'job.refPoint':'Punto de referencia',
+                'job.relInfo':'Posiciona el láser manualmente → el trabajo se graba relativo al punto de referencia.',
+                'job.refNone':'sin definir', 'job.refSet':'Punto de referencia definido en',
+                'job.relOn':'Modo relativo ACTIVADO: el trabajo se graba relativo a la posición actual del láser. Se requiere un punto de referencia.',
+                'job.relOff':'Modo relativo DESACTIVADO.', 'job.refHint':'Haz clic en el área de trabajo para definir el punto de referencia (se ajusta a las esquinas).',
+                'job.refMissing':'Modo relativo: ¡define primero un punto de referencia!',
+                'job.pointerStart':'🔦 Láser de posición ON', 'job.pointerStop':'🔦 Láser de posición OFF',
+                'job.pointerHint':'Láser a potencia mínima para posicionar. Se apaga al siguiente clic o tras 2 min.',
+                'job.pointerOnLog':'Láser de posición ON, potencia mínima', 'job.pointerOffLog':'Láser de posición OFF',
                 'panel.control':'🕹️ Control y consola', 'ctrl.send':'Enviar comando', 'ctrl.histHint':'↑/↓ recorre el historial de comandos', 'ctrl.home':'Inicio',
                 'ctrl.homeTip':'Ciclo de origen (Home $H)', 'ctrl.zeroTip':'Fijar posición actual como X0/Y0',
                 'ctrl.pumpOn':'Bomba ON', 'ctrl.pumpOff':'Bomba OFF', 'ctrl.pumpTip':'Alternar bomba (M8/M9)',
                 'ctrl.jog':'🎯 Controlador Jog gráfico',
                 'panel.project':'💾 Proyecto', 'project.save':'Guardar proyecto (.json)', 'project.load':'Cargar proyecto',
-                'panel.tools':'🛠️ Herramientas', 'tools.draw':'Dibujar', 'tools.rect':'Dibujar rectángulo',
+                'panel.tools':'🛠️ Herramientas', 'tools.draw':'Dibujar', 'tools.select':'Seleccionar / Mover', 'tools.rect':'Dibujar rectángulo',
                 'tools.circle':'Dibujar círculo', 'tools.polyline':'Dibujar polilínea (ESC para terminar)',
                 'tools.text':'Añadir texto', 'tools.shapes':'Biblioteca de formas',
                 'tools.genGroup':'Generadores / Agrupar', 'tools.box':'Generador de cajas (ensamble)',
@@ -4160,12 +4375,21 @@
                 'machine.width':'宽度 (X mm)', 'machine.height':'高度 (Y mm)', 'machine.applySize':'应用尺寸',
                 'panel.job':'🎛️ 任务控制', 'job.run':'▶ 运行任务', 'job.runShort':'运行', 'job.stop':'⏹ 停止 / 中止',
                 'job.unlock':'解锁', 'job.unlockTip':'清除报警 (Unlock $X)',
+                'job.relMode':'📌 相对模式', 'job.setRef':'📌 设置参考点', 'job.refPoint':'参考点',
+                'job.relInfo':'手动定位激光头 → 任务将相对于参考点进行雕刻。',
+                'job.refNone':'未设置', 'job.refSet':'参考点已设置于',
+                'job.relOn':'相对模式开启：任务将相对于当前激光位置雕刻。需要先设置参考点。',
+                'job.relOff':'相对模式关闭。', 'job.refHint':'在工作区中点击以设置参考点（可吸附到角点）。',
+                'job.refMissing':'相对模式：请先设置参考点！',
+                'job.pointerStart':'🔦 开启定位激光', 'job.pointerStop':'🔦 关闭定位激光',
+                'job.pointerHint':'以最小功率开启激光用于定位。下次点击或 2 分钟后自动关闭。',
+                'job.pointerOnLog':'定位激光开启，最小功率', 'job.pointerOffLog':'定位激光关闭',
                 'panel.control':'🕹️ 控制与控制台', 'ctrl.send':'发送命令', 'ctrl.histHint':'↑/↓ 浏览命令历史', 'ctrl.home':'回零',
                 'ctrl.homeTip':'回零循环 (Home $H)', 'ctrl.zeroTip':'将当前位置设为 X0/Y0',
                 'ctrl.pumpOn':'水泵 开', 'ctrl.pumpOff':'水泵 关', 'ctrl.pumpTip':'切换水泵 (M8/M9)',
                 'ctrl.jog':'🎯 图形点动控制器',
                 'panel.project':'💾 项目', 'project.save':'保存项目 (.json)', 'project.load':'加载项目',
-                'panel.tools':'🛠️ 工具', 'tools.draw':'绘制', 'tools.rect':'绘制矩形',
+                'panel.tools':'🛠️ 工具', 'tools.draw':'绘制', 'tools.select':'选择 / 移动', 'tools.rect':'绘制矩形',
                 'tools.circle':'绘制圆形', 'tools.polyline':'绘制折线 (ESC 结束)',
                 'tools.text':'添加文字', 'tools.shapes':'形状库',
                 'tools.genGroup':'生成器 / 组合', 'tools.box':'盒子生成器 (指接)',
@@ -4379,6 +4603,8 @@
             document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.getAttribute('data-i18n-title')); });
             document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
             if (typeof _updatePumpLabel === 'function') _updatePumpLabel();
+            if (typeof updateRefPointStatus === 'function') updateRefPointStatus();
+            if (typeof updatePointerLaserBtn === 'function') updatePointerLaserBtn();
             document.documentElement.lang = _lang;
             let sel = document.getElementById('langSelect');
             if (sel) sel.value = _lang;
@@ -4477,10 +4703,16 @@
                     return;
                 }
                 
+                // Sichtbares Zentrum des Arbeitsbereichs in Canvas-Koordinaten (mm) ermitteln,
+                // sonst landet der Text außerhalb (canvas.width/height sind Pixel des Viewports).
+                let vpt = canvas.viewportTransform;
+                let cx = (canvas.width  / 2 - vpt[4]) / vpt[0];
+                let cy = (canvas.height / 2 - vpt[5]) / vpt[3];
+
                 // 2. Erstelle ein reines Vektor-Objekt (fabric.Path) statt eines Text-Objekts!
                 const fabricPath = new fabric.Path(pathData, {
-                    left: canvas.width / 2,
-                    top: canvas.height / 2,
+                    left: cx,
+                    top: cy,
                     originX: 'center',
                     originY: 'center',
                     fill: 'transparent',
@@ -4572,11 +4804,15 @@
                     
                     // 1. Objekte temporär gruppieren, damit die SVG-internen Maße (ViewBox) greifen
                     const tempGroup = fabric.util.groupSVGElements(objects, options);
-                    
-                    // 2. Die Gruppe einmal sauber in der Mitte des Arbeitsbereichs platzieren
+
+                    // 2. Die Gruppe im sichtbaren Zentrum des Arbeitsbereichs platzieren.
+                    //    (canvas.width/height sind Viewport-Pixel → würde außerhalb landen)
+                    let vpt = canvas.viewportTransform;
+                    let cx = (canvas.width  / 2 - vpt[4]) / vpt[0];
+                    let cy = (canvas.height / 2 - vpt[5]) / vpt[3];
                     tempGroup.set({
-                        left: canvas.width / 2,
-                        top: canvas.height / 2,
+                        left: cx,
+                        top: cy,
                         originX: 'center',
                         originY: 'center'
                     });
@@ -4677,6 +4913,9 @@
         let _snapEnabled = true;   // Alt = temporär deaktivieren
         let _magnetPoint = null;   // aktueller Snap-Punkt oder null
         let _snapIndicator = null; // visueller Indikator (Kreis)
+        // Fluchtlinien-Snap: zuletzt mit der Maus überfahrener Eckpunkt als Referenz.
+        let _alignRef = null;            // {x,y} oder null
+        let _alignGuideV = null, _alignGuideH = null; // gestrichelte Hilfslinien
         // Beim Handle-Ziehen vom Snap ausschließen: das gezogene Handle selbst (+ verbundene)
         // sowie nur dessen ANGRENZENDE Segmente. So bleibt das Einrasten auf die eigenen
         // anderen Eckpunkte/Segmente der Polylinie möglich.
@@ -4710,6 +4949,51 @@
             _snapIndicator.set({ left: x, top: y, radius: r, strokeWidth: sw, stroke: color, visible: true });
             _snapIndicator.bringToFront();
             _magnetPoint = { x, y };
+        }
+
+        // --- Fluchtlinien-Snap (Ausrichten an einem überfahrenen Eckpunkt) ---
+        function _ensureAlignGuides() {
+            if (_alignGuideV) return;
+            let mk = () => new fabric.Line([0, 0, 0, 0], {
+                stroke: '#33ccff', strokeWidth: 1, strokeDashArray: [6, 4],
+                selectable: false, evented: false, excludeFromExport: true, visible: false
+            });
+            _alignGuideV = mk(); _alignGuideH = mk();
+            canvas.add(_alignGuideV); canvas.add(_alignGuideH);
+        }
+        function _hideAlignGuides() {
+            if (_alignGuideV) _alignGuideV.set({ visible: false });
+            if (_alignGuideH) _alignGuideH.set({ visible: false });
+        }
+        // Zeigt die Hilfslinie(n) für das aktuelle Ausrichten an
+        function _showAlignGuide(al) {
+            _ensureAlignGuides();
+            let sw = 1.5 / canvas.getZoom();
+            // Sichtbaren Canvas-Bereich (in mm) aus dem Viewport berechnen und die
+            // Hilfslinie nur darüber spannen – extrem lange Linien rendert der Browser
+            // (gestrichelt) sonst unzuverlässig, dann ist nichts sichtbar.
+            let vpt = canvas.viewportTransform;
+            let x0 = (0 - vpt[4]) / vpt[0], x1 = (canvas.width  - vpt[4]) / vpt[0];
+            let y0 = (0 - vpt[5]) / vpt[3], y1 = (canvas.height - vpt[5]) / vpt[3];
+            if (al.alignV) {
+                _alignGuideV.set({ x1: al.x, y1: y0, x2: al.x, y2: y1, strokeWidth: sw, visible: true });
+                _alignGuideV.bringToFront();
+            } else { _alignGuideV.set({ visible: false }); }
+            if (al.alignH) {
+                _alignGuideH.set({ x1: x0, y1: al.y, x2: x1, y2: al.y, strokeWidth: sw, visible: true });
+                _alignGuideH.bringToFront();
+            } else { _alignGuideH.set({ visible: false }); }
+        }
+        // Liefert einen achsen-ausgerichteten Punkt zum Referenz-Eckpunkt (oder null).
+        // Es wird nur EINE Achse gesnappt – die, die der Maus näher liegt.
+        function getAlignSnap(pointer) {
+            if (!_alignRef || !_snapEnabled) return null;
+            let T = 14 / canvas.getZoom();   // Fang-Zone der Fluchtlinie (vergrößert)
+            let dx = Math.abs(pointer.x - _alignRef.x);
+            let dy = Math.abs(pointer.y - _alignRef.y);
+            if (dx < T && dx <= dy) return { x: _alignRef.x, y: pointer.y, alignV: true,  alignH: false };
+            if (dy < T)            return { x: pointer.x, y: _alignRef.y, alignV: false, alignH: true  };
+            return null;
         }
 
         // Nächsten Punkt auf einem Liniensegment berechnen
@@ -4995,51 +5279,136 @@
             return best;
         }
 
+        let activeTool = 'select';   // 'select' | 'polyline'
+
+        // Markiert das aktuell aktive Werkzeug in der Werkzeugleiste
+        function _updateToolHighlight(tool) {
+            activeTool = tool;
+            document.querySelectorAll('.icon-btn.tool-active').forEach(b => b.classList.remove('tool-active'));
+            let id = (tool === 'polyline') ? 'toolPolyline' : 'toolSelect';
+            let b = document.getElementById(id);
+            if (b) b.classList.add('tool-active');
+        }
+
+        // Zeiger-/Auswahlwerkzeug: beendet jeden Zeichenmodus, normale Selektion aktiv
+        function activateSelectTool() {
+            if (isPolyMode) finishPolylineMode();
+            isMovingLaser = false;
+            isSettingOrigin = false;
+            isSettingRefPoint = false;
+            canvas.skipTargetFind = false;
+            canvas.selection = true;
+            canvas.defaultCursor = 'default';
+            document.getElementById('workspaceCanvas').style.cursor = 'default';
+            _updateToolHighlight('select');
+        }
+
         function startPolylineMode() {
+            if (isPolyMode) return;            // schon im Modus
             isPolyMode = true;
             activePoints = [];
             activeLines = [];
             activeHandles = [];
             currentChainId = 'poly_' + Date.now();
+            _magnetPoint = null;
+            _alignRef = null;
 
+            // Objekte nicht anvisieren: so wechselt der Cursor nicht in den Auswahl-Modus
+            // und der erste Punkt kann frei (auch auf einer anderen Linie) gesetzt werden.
+            canvas.skipTargetFind = true;
+            canvas.selection = false;
             canvas.defaultCursor = 'crosshair';
             canvas.discardActiveObject();
             canvas.renderAll();
+            _updateToolHighlight('polyline');
             logMessage("SYSTEM", "Linienzug-Modus. Klicke für Punkte. (ESC zum Beenden, Alt = Magnet aus)", "#3498db");
+        }
+
+        // Polylinien-Modus sauber beenden (von ESC und vom Auswahlwerkzeug genutzt)
+        function finishPolylineMode() {
+            if (!isPolyMode) return;
+            isPolyMode = false;
+            canvas.defaultCursor = 'default';
+            canvas.skipTargetFind = false;
+            canvas.selection = true;
+            document.getElementById('cadDialog').style.display = 'none';
+            if (previewLine) { canvas.remove(previewLine); previewLine = null; }
+            _hideSnap();
+            _hidePolyInfo();
+            _hideAlignGuides();
+            _alignRef = null;
+            canvas.discardActiveObject();
+            updatePolyHandleVisibility();
+            canvas.renderAll();
+            _updateToolHighlight('select');
+            logMessage("SYSTEM", "Linienzug abgeschlossen.", "#28a745");
         }
 
         // 2. Mausbewegung fangen (Vorschau-Linie & Snapping)
         canvas.on('mouse:move', function(o) {
-            if (!isPolyMode || activePoints.length === 0 || !previewLine || document.getElementById('cadDialog').style.display === 'block') {
+            if (!isPolyMode || document.getElementById('cadDialog').style.display === 'block') {
                 // Nicht ausblenden, während gerade ein Eckpunkt gezogen wird –
                 // dieser Handler feuert parallel zum Handle-'moving' und würde sonst
-                // das vom Drag gesetzte Label sofort wieder verstecken.
-                if (!_polyHandleDragging) _hidePolyInfo();
+                // das vom Drag gesetzte Label/Hilfslinien sofort wieder verstecken.
+                if (!_polyHandleDragging) { _hidePolyInfo(); _hideAlignGuides(); }
                 return;
             }
 
             let pointer = canvas.getPointer(o.e);
+
+            // ERSTER PUNKT (noch keiner gesetzt): nur Snap berechnen/anzeigen, damit auch
+            // der Startpunkt magnetisch an anderen Objekten/Ecken einrasten kann.
+            if (activePoints.length === 0) {
+                let s = getMagnetSnap(pointer);
+                if (s && s.type === 'endpoint') _alignRef = { x: s.x, y: s.y };
+                if (s) {
+                    _showSnap(s.x, s.y, s.type);   // setzt _magnetPoint → mouse:down nutzt ihn
+                    _hideAlignGuides();
+                } else {
+                    _hideSnap();
+                    let al = getAlignSnap(pointer);
+                    if (al) { _showAlignGuide(al); _magnetPoint = { x: al.x, y: al.y }; }
+                    else { _hideAlignGuides(); }
+                }
+                _hidePolyInfo();
+                canvas.renderAll();
+                return;
+            }
+
+            if (!previewLine) return;
             let lastPt = activePoints[activePoints.length - 1];
             let finalX, finalY;
 
             // Magnet-Snap hat höchste Priorität
             let snap = getMagnetSnap(pointer);
+            if (snap && snap.type === 'endpoint') _alignRef = { x: snap.x, y: snap.y }; // überfahrenen Eckpunkt merken
             if (snap) {
                 finalX = snap.x;
                 finalY = snap.y;
                 _showSnap(finalX, finalY, snap.type);
+                _hideAlignGuides();
             } else {
                 _hideSnap();
-                // Winkel-Snap (45°-Raster)
-                let angleRad = Math.atan2(pointer.y - lastPt.y, pointer.x - lastPt.x);
-                let angleDeg = angleRad * (180 / Math.PI);
-                let snappedAngle = Math.round(angleDeg / 45) * 45;
-                finalX = pointer.x;
-                finalY = pointer.y;
-                if (Math.abs(angleDeg - snappedAngle) <= 5) {
-                    let dist = Math.hypot(pointer.x - lastPt.x, pointer.y - lastPt.y);
-                    finalX = lastPt.x + Math.cos(snappedAngle * Math.PI / 180) * dist;
-                    finalY = lastPt.y + Math.sin(snappedAngle * Math.PI / 180) * dist;
+                // Fluchtlinien-Snap zum zuletzt überfahrenen Eckpunkt
+                let al = getAlignSnap(pointer);
+                if (al) {
+                    finalX = al.x;
+                    finalY = al.y;
+                    _showAlignGuide(al);
+                    _magnetPoint = { x: finalX, y: finalY }; // damit mouse:down den Punkt übernimmt
+                } else {
+                    _hideAlignGuides();
+                    // Winkel-Snap (45°-Raster)
+                    let angleRad = Math.atan2(pointer.y - lastPt.y, pointer.x - lastPt.x);
+                    let angleDeg = angleRad * (180 / Math.PI);
+                    let snappedAngle = Math.round(angleDeg / 45) * 45;
+                    finalX = pointer.x;
+                    finalY = pointer.y;
+                    if (Math.abs(angleDeg - snappedAngle) <= 5) {
+                        let dist = Math.hypot(pointer.x - lastPt.x, pointer.y - lastPt.y);
+                        finalX = lastPt.x + Math.cos(snappedAngle * Math.PI / 180) * dist;
+                        finalY = lastPt.y + Math.sin(snappedAngle * Math.PI / 180) * dist;
+                    }
                 }
             }
 
@@ -5086,6 +5455,7 @@
             if (_polyHandleDragging) {
                 _polyHandleDragging = false;
                 _hidePolyInfo();
+                _hideAlignGuides();
             }
         });
 
@@ -5108,20 +5478,7 @@
         // 3. Tasten-Handler: ESC = Beenden, Alt = Magnet temporär aus
         window.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && isPolyMode) {
-                isPolyMode = false;
-                canvas.defaultCursor = 'default';
-                document.getElementById('cadDialog').style.display = 'none';
-
-                if (previewLine) {
-                    canvas.remove(previewLine);
-                    previewLine = null;
-                }
-                _hideSnap();
-                _hidePolyInfo();
-                canvas.discardActiveObject();
-                updatePolyHandleVisibility();
-                canvas.renderAll();
-                logMessage("SYSTEM", "Linienzug abgeschlossen.", "#28a745");
+                finishPolylineMode();
             }
             // Alt: Magnet temporär deaktivieren
             if (e.key === 'Alt' && isPolyMode) {
@@ -5144,8 +5501,9 @@
             let obj = e.target;
             if (!obj) return;
 
-            _hideSnap();      // Snap-Indikator nach dem Loslassen ausblenden
-            _hidePolyInfo();  // Live-Längen/Winkel-Label ausblenden
+            _hideSnap();         // Snap-Indikator nach dem Loslassen ausblenden
+            _hidePolyInfo();     // Live-Längen/Winkel-Label ausblenden
+            _hideAlignGuides();  // Fluchtlinien ausblenden
 
             // Verschmelzen: Liegt der losgelassene Eckpunkt exakt auf einem anderen
             // Eckpunkt (eingerastet), werden beide dauerhaft verbunden.
@@ -5387,6 +5745,7 @@
                     let icon = document.getElementById('machineStatusIcon');
                     if (icon) icon.title = txt;
                 } else if (data.type === 'job_done') {
+                    _jobRunning = false;
                     document.getElementById('progressBar').style.width = '100%';
                     document.getElementById('progressText').innerText = '100%';
                     hideLaserWarning();     // Laserstrahlung-Warnung ausblenden
@@ -5436,6 +5795,7 @@
                             document.getElementById('powerInput').title = "Maximaler Wert: " + val;
                             logMessage("SYSTEM", `Max Laser-Power ($30) liegt bei: ${val}`, "#3498db");
                         } else if (param === 32) {
+                            _laserModeValue = val;   // für den Pointer-Laser merken (Wiederherstellung)
                             if (val === 0) {
                                 logMessage("WARNUNG", "Lasermodus ($32) ist AUS! Laser könnte bei G0-Fahrten brennen!", "red");
                             } else {
@@ -5561,6 +5921,7 @@
                 ws.send(JSON.stringify({ action: "abort_job" }));
                 logMessage("USER", "ABBRUCH ANGEFORDERT!", "red");
                 schedulePumpOff(10);    // Pumpe läuft noch 10 s nach
+                _jobRunning = false;
                 hideLaserWarning();     // Laserstrahlung-Warnung ausblenden
             } else {
                 alert("Keine Verbindung zum Agenten!");
@@ -5571,12 +5932,22 @@
             let objs = canvas.getObjects().filter(o => !o.excludeFromExport && o !== workspaceRect);
             if (objs.length === 0) { alert("Zeichenfläche ist leer!"); return; }
 
+            // Relativ-Modus erfordert zwingend einen Referenzpunkt
+            if (relativeMode && !refPoint) {
+                alert(t('job.refMissing'));
+                activateRefPointMode();
+                return;
+            }
+
             // Nachlauf-Timer abbrechen und Pumpe einschalten (M8 ist auch im G-Code)
             cancelPumpOff();
             if (!isPumpOn) setPumpState(true);
 
-            const oX = originMarker.left;
-            const oY = workspaceHeight - originMarker.top;
+            // Ursprung der Koordinaten: im Relativ-Modus der Referenzpunkt
+            // (→ er wird zu Maschinen-0/0, also zur aktuellen Laserposition),
+            // sonst der normale Nullpunkt-Marker.
+            const oX = relativeMode ? refPoint.x : originMarker.left;
+            const oY = relativeMode ? (workspaceHeight - refPoint.y) : (workspaceHeight - originMarker.top);
 
             // --- INTELLIGENTE SORTIERUNG NACH EBENEN ---
             const orderStrategy = document.getElementById('jobOrder').value;
@@ -5692,11 +6063,14 @@
                 job: job,
                 height: workspaceHeight,
                 originX: oX,
-                originY: oY
+                originY: oY,
+                relative: relativeMode   // im Relativ-Modus: aktuelle Laserposition = Referenzpunkt (G92 X0 Y0)
                 // Hinweis: Globale Feedrate/Power senden wir nicht mehr, da jedes Objekt seine eigenen hat!
             }));
+            if (relativeMode) logMessage("SYSTEM", t('job.relOn'), "#e67e22");
 
             // Job enthält Laser-Operationen → Laserstrahlung-Warnung einblenden
+            _jobRunning = true;
             showLaserWarning();
         }
 

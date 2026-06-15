@@ -708,8 +708,15 @@ async def handle_client(websocket, path=None):
                 power = data.get("power", 800)
                 height = data.get("height", 600)
                 ox, oy = data.get("originX", 0), data.get("originY", 0)
+                relative = data.get("relative", False)
 
                 gcode = ["; --- START MIXED JOB ---", "M8", "G21", "G90", "M5"]
+                # Relativ-Modus: die aktuelle (manuell angefahrene) Laserposition wird
+                # zum Referenzpunkt (0/0). Die Job-Koordinaten sind bereits relativ zum
+                # Referenzpunkt erzeugt (originX/Y = Referenzpunkt).
+                if relative:
+                    gcode.append("G92 X0 Y0")
+                    print("DEBUG: Relativ-Modus aktiv -> G92 X0 Y0 (aktuelle Position = Referenzpunkt)")
                 for item in job_list:
                     print(f"DEBUG: Verarbeite Item Typ: {item.get('type')}") # <--- WICHTIG!
                     item_type = item.get("type")
@@ -753,7 +760,11 @@ async def handle_client(websocket, path=None):
                         gcode.extend(generate_gcode_from_svg(svg_part, item_speed, item_power, height, ox, oy, engrave_mode, line_interval))
 
                 gcode.append("M5")
-                
+                # Relativ-Modus: temporären G92-Offset wieder aufheben, damit die
+                # normale (absolute) Nullung (G10 L20 / G54) unverändert bleibt.
+                if relative:
+                    gcode.append("G92.1")
+
                 # Filtere leere Zeilen und Zeilen ohne Buchstaben-Kommando
                 final_gcode = []
                 for line in gcode:
