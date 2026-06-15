@@ -50,6 +50,62 @@ def save_materials_file(mats):
         print(f"Material-Datei Schreibfehler: {e}")
         return False
 
+# --- KAMERA (Raspberry Pi, CSI über picamera2/libcamera) ---
+_picam = None  # Picamera2-Instanz (einmal initialisiert, dann offen gehalten)
+
+def capture_camera_jpeg():
+    """Nimmt ein Standbild der Pi-Kamera auf und gibt es als Base64-JPEG zurück.
+    Lazy-Import von picamera2: läuft die App ohne Kamera (z. B. auf Windows),
+    wird hier eine klare Fehlermeldung ausgelöst, ohne den Start zu blockieren."""
+    global _picam
+    import base64
+    try:
+        from picamera2 import Picamera2
+    except Exception:
+        raise RuntimeError("picamera2 nicht verfügbar. Auf dem Raspberry Pi installieren: "
+                           "sudo apt install -y python3-picamera2 (und venv mit --system-site-packages).")
+    if _picam is None:
+        _picam = Picamera2()
+        cfg = _picam.create_still_configuration(main={"size": (1640, 1232)})
+        _picam.configure(cfg)
+        _picam.start()
+        time.sleep(2)  # Belichtung/Weißabgleich beim ersten Start einpendeln lassen
+    buf = io.BytesIO()
+    _picam.capture_file(buf, format="jpeg")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+def capture_usb_jpeg(index=0, width=2048, height=1536):
+    """Nimmt ein Standbild einer USB-Kamera (UVC) über OpenCV auf -> Base64-JPEG.
+    Lazy-Import von cv2, damit die App ohne OpenCV/Kamera weiter läuft."""
+    import base64
+    try:
+        import cv2
+    except Exception:
+        raise RuntimeError("OpenCV (cv2) nicht verfügbar. Auf dem Raspberry Pi: "
+                           "sudo apt install -y python3-opencv (Windows: pip install opencv-python).")
+    backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_V4L2
+    cap = cv2.VideoCapture(index, backend)
+    if not cap.isOpened():
+        cap = cv2.VideoCapture(index)   # Fallback ohne explizites Backend
+    if not cap.isOpened():
+        raise RuntimeError(f"USB-Kamera (Index {index}) konnte nicht geöffnet werden.")
+    try:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        frame = None
+        for _ in range(8):              # ein paar Frames für Auto-Belichtung
+            ok, f = cap.read()
+            if ok:
+                frame = f
+        if frame is None:
+            raise RuntimeError("Kein Bild von der USB-Kamera erhalten.")
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not ok:
+            raise RuntimeError("JPEG-Encodierung der USB-Kamera fehlgeschlagen.")
+        return base64.b64encode(buf.tobytes()).decode("ascii")
+    finally:
+        cap.release()
+
 # --- GLOBALE VARIABLEN ---
 laser_serial = None
 connected_websocket = None
@@ -690,6 +746,24 @@ async def handle_client(websocket, path=None):
                 ports = [port.device for port in serial.tools.list_ports.comports()]
                 print(f"DEBUG: Gefundene Ports: {ports}")
                 await websocket.send(json.dumps({"type": "ports_list", "ports": ports}))
+
+            elif action == "capture_camera":
+                # Standbild der Kamera aufnehmen (blockierend → in Thread auslagern).
+                # source: "csi" (Pi-Kamera/picamera2) oder "usb" (UVC/OpenCV).
+                source = data.get("source", "csi")
+                try:
+                    loop = asyncio.get_running_loop()
+                    if source == "usb":
+                        idx = int(data.get("device", 0))
+                        b64 = await loop.run_in_executor(None, capture_usb_jpeg, idx)
+                    else:
+                        b64 = await loop.run_in_executor(None, capture_camera_jpeg)
+                    await websocket.send(json.dumps({"type": "camera_photo",
+                                                     "data": "data:image/jpeg;base64," + b64}))
+                    print(f"DEBUG: Kamerabild ({source}) aufgenommen und gesendet.")
+                except Exception as e:
+                    print(f"DEBUG: Kamera-Fehler ({source}): {e}")
+                    await websocket.send(json.dumps({"type": "camera_error", "msg": str(e)}))
 
             elif action == "disconnect":
                 print("DEBUG: Trenne Laser-Verbindung...")

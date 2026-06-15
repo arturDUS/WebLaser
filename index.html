@@ -546,6 +546,25 @@
                 </button>
                 <input type="file" id="photoUpload" accept="image/*" style="display: none;">
             </div>
+
+            <!-- Kamera-Hintergrundbild (Pi-Kamera über CSI oder USB-Kamera) -->
+            <div style="display: flex; gap: 5px; margin-top: 6px; align-items: center;">
+                <select id="camSource" onchange="localStorage.setItem('camSource', this.value)" data-i18n-title="cam.source" title="Kameraquelle"
+                        style="background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 12px; padding: 7px 4px;">
+                    <option value="csi" data-i18n="cam.srcCsi">Pi-Kamera (CSI)</option>
+                    <option value="usb" data-i18n="cam.srcUsb">USB-Kamera</option>
+                </select>
+                <button onclick="captureCameraBg()" data-i18n-title="cam.captureTip" title="Kamerabild aufnehmen"
+                        style="flex: 1; background: #8e44ad; color: #fff; border: none; padding: 8px; margin: 0; box-sizing: border-box; text-align: center; cursor: pointer; border-radius: 4px; font-size: 13px;" data-i18n="cam.capture">
+                    📷 Kamerabild
+                </button>
+                <button id="camRemoveBtn" onclick="removeCameraBg()" data-i18n-title="cam.removeTip" title="Kamerabild entfernen" disabled
+                        style="background: #555; color: #fff; border: none; padding: 8px 10px; margin: 0; cursor: pointer; border-radius: 4px; font-size: 13px;">✕</button>
+            </div>
+            <div id="camOpacityRow" style="display: none; align-items: center; gap: 6px; margin-top: 4px; font-size: 11px; color: #aaa;">
+                <span data-i18n="cam.opacity">Transparenz</span>
+                <input type="range" id="camOpacity" min="10" max="90" value="45" oninput="setCameraBgOpacity(this.value)" style="flex: 1;">
+            </div>
         </div>
 
         <!-- OBJEKTE & EBENEN -->
@@ -4272,6 +4291,10 @@
                 'align.right':'Rechts ausrichten', 'align.top':'Oben ausrichten', 'align.centerY':'Vertikal zentrieren', 'align.bottom':'Unten ausrichten',
                 'panel.import':'📥 Importieren', 'import.svg':'📐 SVG', 'import.svgTip':'Vektor-SVG importieren',
                 'import.img':'🖼️ Bild', 'import.imgTip':'Foto/Bild laden & gravieren',
+                'cam.capture':'📷 Kamerabild', 'cam.captureTip':'Kamerabild aufnehmen und als Hintergrund einblenden',
+                'cam.removeTip':'Kamerabild entfernen', 'cam.opacity':'Transparenz',
+                'cam.loading':'Kamerabild wird aufgenommen…', 'cam.ok':'Kamerabild als Hintergrund eingeblendet.',
+                'cam.error':'Kamera-Fehler:', 'cam.source':'Kameraquelle', 'cam.srcCsi':'Pi-Kamera (CSI)', 'cam.srcUsb':'USB-Kamera',
                 'panel.objects':'📋 Objekte & Ebenen', 'obj.type':'Typ', 'obj.action':'Aktion',
                 'panel.layerParams':'⚙️ Ebenen-Parameter', 'mat.lib':'📚 Materialbibliothek', 'mat.libTip':'Materialbibliothek öffnen',
                 'layer.order':'Abarbeitungs-Reihenfolge:', 'layer.engraveFirst':'1. Gravieren, dann Schneiden (Empfohlen)',
@@ -4314,6 +4337,10 @@
                 'align.right':'Align right', 'align.top':'Align top', 'align.centerY':'Center vertically', 'align.bottom':'Align bottom',
                 'panel.import':'📥 Import', 'import.svg':'📐 SVG', 'import.svgTip':'Import vector SVG',
                 'import.img':'🖼️ Image', 'import.imgTip':'Load image & engrave',
+                'cam.capture':'📷 Camera', 'cam.captureTip':'Capture a camera image and show it as background',
+                'cam.removeTip':'Remove camera image', 'cam.opacity':'Opacity',
+                'cam.loading':'Capturing camera image…', 'cam.ok':'Camera image shown as background.',
+                'cam.error':'Camera error:', 'cam.source':'Camera source', 'cam.srcCsi':'Pi camera (CSI)', 'cam.srcUsb':'USB camera',
                 'panel.objects':'📋 Objects & Layers', 'obj.type':'Type', 'obj.action':'Action',
                 'panel.layerParams':'⚙️ Layer parameters', 'mat.lib':'📚 Material library', 'mat.libTip':'Open material library',
                 'layer.order':'Processing order:', 'layer.engraveFirst':'1. Engrave, then cut (recommended)',
@@ -4356,6 +4383,10 @@
                 'align.right':'Alinear a la derecha', 'align.top':'Alinear arriba', 'align.centerY':'Centrar verticalmente', 'align.bottom':'Alinear abajo',
                 'panel.import':'📥 Importar', 'import.svg':'📐 SVG', 'import.svgTip':'Importar SVG vectorial',
                 'import.img':'🖼️ Imagen', 'import.imgTip':'Cargar imagen y grabar',
+                'cam.capture':'📷 Cámara', 'cam.captureTip':'Capturar imagen de la cámara y mostrarla de fondo',
+                'cam.removeTip':'Quitar imagen de la cámara', 'cam.opacity':'Opacidad',
+                'cam.loading':'Capturando imagen de la cámara…', 'cam.ok':'Imagen de la cámara mostrada de fondo.',
+                'cam.error':'Error de cámara:', 'cam.source':'Fuente de cámara', 'cam.srcCsi':'Cámara Pi (CSI)', 'cam.srcUsb':'Cámara USB',
                 'panel.objects':'📋 Objetos y capas', 'obj.type':'Tipo', 'obj.action':'Acción',
                 'panel.layerParams':'⚙️ Parámetros de capa', 'mat.lib':'📚 Biblioteca de materiales', 'mat.libTip':'Abrir biblioteca de materiales',
                 'layer.order':'Orden de procesamiento:', 'layer.engraveFirst':'1. Grabar, luego cortar (recomendado)',
@@ -4398,6 +4429,10 @@
                 'align.right':'右对齐', 'align.top':'顶部对齐', 'align.centerY':'垂直居中', 'align.bottom':'底部对齐',
                 'panel.import':'📥 导入', 'import.svg':'📐 SVG', 'import.svgTip':'导入矢量 SVG',
                 'import.img':'🖼️ 图片', 'import.imgTip':'加载图片并雕刻',
+                'cam.capture':'📷 摄像头', 'cam.captureTip':'拍摄摄像头图像并作为背景显示',
+                'cam.removeTip':'移除摄像头图像', 'cam.opacity':'透明度',
+                'cam.loading':'正在拍摄摄像头图像…', 'cam.ok':'摄像头图像已作为背景显示。',
+                'cam.error':'摄像头错误：', 'cam.source':'摄像头来源', 'cam.srcCsi':'Pi 摄像头 (CSI)', 'cam.srcUsb':'USB 摄像头',
                 'panel.objects':'📋 对象与图层', 'obj.type':'类型', 'obj.action':'操作',
                 'panel.layerParams':'⚙️ 图层参数', 'mat.lib':'📚 材料库', 'mat.libTip':'打开材料库',
                 'layer.order':'处理顺序：', 'layer.engraveFirst':'1. 先雕刻，后切割 (推荐)',
@@ -4740,6 +4775,58 @@
             }
         }
        
+        // --- KAMERA-HINTERGRUNDBILD (Raspberry-Pi-Kamera über dem Arbeitsbereich) ---
+        let _cameraBg = null;   // fabric.Image des aktuellen Kamerabilds oder null
+
+        function captureCameraBg() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) { alert("Keine Verbindung zum Agenten!"); return; }
+            let source = (document.getElementById('camSource') || {}).value || 'csi';
+            logMessage("SYSTEM", t('cam.loading'), "#8e44ad");
+            ws.send(JSON.stringify({ action: "capture_camera", source: source }));
+        }
+        // Zuletzt gewählte Kameraquelle wiederherstellen
+        window.addEventListener('load', function() {
+            let sel = document.getElementById('camSource');
+            let saved = localStorage.getItem('camSource');
+            if (sel && saved) sel.value = saved;
+        });
+
+        // Wird aus ws.onmessage bei 'camera_photo' aufgerufen
+        function _placeCameraBg(dataUrl) {
+            fabric.Image.fromURL(dataUrl, function(img) {
+                removeCameraBg();   // vorheriges Bild entfernen
+                let op = (parseInt(document.getElementById('camOpacity').value) || 45) / 100;
+                img.set({
+                    left: 0, top: 0,
+                    scaleX: workspaceWidth / img.width,
+                    scaleY: workspaceHeight / img.height,
+                    selectable: false, evented: false, excludeFromExport: true,
+                    opacity: op, customType: 'cameraBg'
+                });
+                canvas.add(img);
+                canvas.sendToBack(img);
+                canvas.sendToBack(workspaceRect);   // Bett-Rechteck bleibt ganz hinten
+                _cameraBg = img;
+                let btn = document.getElementById('camRemoveBtn');
+                btn.disabled = false; btn.style.background = '#c0392b';
+                document.getElementById('camOpacityRow').style.display = 'flex';
+                canvas.renderAll();
+                logMessage("SYSTEM", t('cam.ok'), "#8e44ad");
+            });
+        }
+
+        function setCameraBgOpacity(v) {
+            if (_cameraBg) { _cameraBg.set({ opacity: v / 100 }); canvas.renderAll(); }
+        }
+
+        function removeCameraBg() {
+            if (_cameraBg) { canvas.remove(_cameraBg); _cameraBg = null; canvas.renderAll(); }
+            let btn = document.getElementById('camRemoveBtn');
+            if (btn) { btn.disabled = true; btn.style.background = '#555'; }
+            let row = document.getElementById('camOpacityRow');
+            if (row) row.style.display = 'none';
+        }
+
         // --- OBJEKTE SICHER LÖSCHEN (Button & Taste) ---
         function deleteSelected() {
             let activeObjects = canvas.getActiveObjects(); // Holt alle aktuell markierten Objekte
@@ -5744,6 +5831,11 @@
                     logMessage("SYSTEM", txt, "#28a745");
                     let icon = document.getElementById('machineStatusIcon');
                     if (icon) icon.title = txt;
+                } else if (data.type === 'camera_photo') {
+                    _placeCameraBg(data.data);
+                } else if (data.type === 'camera_error') {
+                    logMessage("ERROR", t('cam.error') + ' ' + (data.msg || ''), "red");
+                    alert(t('cam.error') + '\n\n' + (data.msg || ''));
                 } else if (data.type === 'job_done') {
                     _jobRunning = false;
                     document.getElementById('progressBar').style.width = '100%';

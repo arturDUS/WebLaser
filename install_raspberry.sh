@@ -30,9 +30,15 @@ echo "  Zielordner : ${INSTALL_DIR}"
 echo "  Dienst     : ${SERVICE_NAME}.service (Benutzer ${RUN_USER})"
 echo "=================================================="
 
-echo "==> [1/6] Systempakete installieren (Python, git, venv) ..."
+echo "==> [1/6] Systempakete installieren (Python, git, venv, Kamera) ..."
 sudo apt-get update
 sudo apt-get install -y python3 python3-venv python3-pip git
+# Kamera (optionales Hintergrundbild im WebLaser):
+#  - python3-picamera2 -> CSI/Pi-Kamera (libcamera)
+#  - python3-opencv     -> USB-Kamera (UVC)
+# Beides sind System-Pakete -> per apt + venv mit --system-site-packages.
+sudo apt-get install -y python3-picamera2 || echo "Hinweis: python3-picamera2 nicht installiert (CSI-Kamera optional)."
+sudo apt-get install -y python3-opencv    || echo "Hinweis: python3-opencv nicht installiert (USB-Kamera optional)."
 
 echo "==> [2/6] WebLaser von GitHub holen/aktualisieren ..."
 if [ -d "${INSTALL_DIR}/.git" ]; then
@@ -42,7 +48,9 @@ else
 fi
 
 echo "==> [3/6] Python-Umgebung (venv) einrichten ..."
-python3 -m venv "${INSTALL_DIR}/.venv"
+# --system-site-packages: damit das per apt installierte picamera2 (Kamera)
+# in der venv sichtbar ist. Wirkt auch beim erneuten Ausfuehren auf bestehende venvs.
+python3 -m venv --system-site-packages "${INSTALL_DIR}/.venv"
 "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip
 "${INSTALL_DIR}/.venv/bin/pip" install pyserial websockets websocket-client svgelements
 
