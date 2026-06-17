@@ -102,10 +102,20 @@ def _usb_capture_bytes(index=0, width=2048, height=1536):
     if not cap.isOpened():
         raise RuntimeError(f"USB-Kamera (Index {index}) konnte nicht geöffnet werden.")
     try:
+        # WICHTIG: MJPEG anfordern – sonst liefert die Kamera bei hoher Auflösung
+        # unkomprimiertes YUYV, was über USB extrem langsam ist (~10 s pro Bild).
+        try:
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        except Exception:
+            pass
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        try:
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # weniger Puffer → frischeres Bild, weniger Reads nötig
+        except Exception:
+            pass
         frame = None
-        for _ in range(8):              # ein paar Frames für Auto-Belichtung
+        for _ in range(4):              # wenige Frames für Auto-Belichtung
             ok, f = cap.read()
             if ok:
                 frame = f

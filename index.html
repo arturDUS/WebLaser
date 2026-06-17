@@ -6052,6 +6052,7 @@
         // 5. WEBSOCKET PIPELINE & STARTUP
         // ==========================================
         let ws;
+        let _wsReconnectTimer = null;   // Auto-Reconnect-Timer für die Agent-Verbindung
         function logMessage(sender, msg, color = "#0f0") {
             const logDiv = document.getElementById('log');
             if(!logDiv) return;
@@ -6064,17 +6065,23 @@
             let wsHost = window.location.hostname || 'localhost';
             ws = new WebSocket('ws://' + wsHost + ':8765');
             ws.onopen = () => {
+                if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
                 logMessage("SYSTEM", "Agent verbunden.");
                 requestPorts(); // Automatisch nach Ports suchen, wenn die Seite lädt!
                 requestMaterials(); // Materialbibliothek vom Server in den Cache laden
             };
             ws.onclose = () => {
-                logMessage("SYSTEM", "Agent getrennt.", "red");
                 document.getElementById('posState').innerText = "Disconnected";
                 document.getElementById('posState').style.color = "red";
                 setMachineConnectionState(false); // Status auf Rot setzen
                 hideLaserWarning();               // Warnung nicht hängen lassen
+                // Automatisch erneut verbinden (z. B. nach Agent-Neustart/Update)
+                if (!_wsReconnectTimer) {
+                    logMessage("SYSTEM", "Agent getrennt – verbinde neu…", "#e67e22");
+                    _wsReconnectTimer = setTimeout(() => { _wsReconnectTimer = null; connectAgent(); }, 2500);
+                }
             };
+            ws.onerror = () => { try { ws.close(); } catch (e) {} };   // löst onclose + Reconnect aus
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === 'status') {
