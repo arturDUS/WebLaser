@@ -69,8 +69,10 @@ Type=simple
 User=${RUN_USER}
 WorkingDirectory=${INSTALL_DIR}
 ExecStart=${INSTALL_DIR}/.venv/bin/python ${INSTALL_DIR}/agent.py
-Restart=on-failure
-RestartSec=5
+# Restart=always: erlaubt das Update über die Web-UI (Agent beendet sich sauber,
+# systemd startet ihn mit der neuen Version neu – kein sudo/Login nötig).
+Restart=always
+RestartSec=3
 Environment=PYTHONUNBUFFERED=1
 
 [Install]

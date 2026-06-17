@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import http.server
 import io
 import json
@@ -53,12 +54,25 @@ def save_materials_file(mats):
 # --- KAMERA (Raspberry Pi, CSI über picamera2/libcamera) ---
 _picam = None  # Picamera2-Instanz (einmal initialisiert, dann offen gehalten)
 
-def capture_camera_jpeg():
-    """Nimmt ein Standbild der Pi-Kamera auf und gibt es als Base64-JPEG zurück.
-    Lazy-Import von picamera2: läuft die App ohne Kamera (z. B. auf Windows),
-    wird hier eine klare Fehlermeldung ausgelöst, ohne den Start zu blockieren."""
+CAMERA_CALIB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "camera_calib.json")
+
+def _load_calib():
+    try:
+        if os.path.exists(CAMERA_CALIB_FILE):
+            with open(CAMERA_CALIB_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                return d if isinstance(d, dict) else {}
+    except Exception as e:
+        print(f"Kalibrier-Datei Lesefehler: {e}")
+    return {}
+
+def _save_calib(d):
+    with open(CAMERA_CALIB_FILE, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+
+def _csi_capture_bytes():
+    """Pi-Kamera (CSI) über picamera2 -> JPEG-Bytes. Lazy-Import von picamera2."""
     global _picam
-    import base64
     try:
         from picamera2 import Picamera2
     except Exception:
@@ -72,12 +86,10 @@ def capture_camera_jpeg():
         time.sleep(2)  # Belichtung/Weißabgleich beim ersten Start einpendeln lassen
     buf = io.BytesIO()
     _picam.capture_file(buf, format="jpeg")
-    return base64.b64encode(buf.getvalue()).decode("ascii")
+    return buf.getvalue()
 
-def capture_usb_jpeg(index=0, width=2048, height=1536):
-    """Nimmt ein Standbild einer USB-Kamera (UVC) über OpenCV auf -> Base64-JPEG.
-    Lazy-Import von cv2, damit die App ohne OpenCV/Kamera weiter läuft."""
-    import base64
+def _usb_capture_bytes(index=0, width=2048, height=1536):
+    """USB-Kamera (UVC) über OpenCV -> JPEG-Bytes. Lazy-Import von cv2."""
     try:
         import cv2
     except Exception:
@@ -102,9 +114,163 @@ def capture_usb_jpeg(index=0, width=2048, height=1536):
         ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if not ok:
             raise RuntimeError("JPEG-Encodierung der USB-Kamera fehlgeschlagen.")
-        return base64.b64encode(buf.tobytes()).decode("ascii")
+        return buf.tobytes()
     finally:
         cap.release()
+
+def _bed_targets(out_w, out_h, n):
+    """Soll-Positionen der Kalibrierpunkte im entzerrten Ausgabebild (gleiche Reihenfolge
+    wie im Dialog): 4 Ecken, optional + 4 Kantenmitten."""
+    import numpy as np
+    W, H = float(out_w), float(out_h)
+    pts = [[0, 0], [W, 0], [W, H], [0, H]]
+    if n == 8:
+        pts += [[W / 2, 0], [W, H / 2], [W / 2, H], [0, H / 2]]
+    return np.array(pts, dtype=np.float32)
+
+def _build_tps_maps(src_img, dst_bed, out_w, out_h):
+    """Thin-Plate-Spline: bildet jede Ausgabe-(Bett-)Position auf die Quell-(Bild-)Koordinate
+    ab und liefert remap-Maps (map_x, map_y). Korrigiert Perspektive UND Verzeichnung."""
+    import numpy as np
+    P = np.asarray(dst_bed, dtype=np.float64)   # Kontrollpunkte im Ausgabe-/Bett-Raum
+    V = np.asarray(src_img, dtype=np.float64)   # zugehoerige Bild-Koordinaten
+    n = P.shape[0]
+    def U(r2):
+        return np.where(r2 > 1e-12, r2 * np.log(np.maximum(r2, 1e-12)), 0.0)
+    diff = P[:, None, :] - P[None, :, :]
+    K = U((diff ** 2).sum(-1))
+    Pmat = np.hstack([np.ones((n, 1)), P])      # n x 3  (1, x, y)
+    L = np.zeros((n + 3, n + 3))
+    L[:n, :n] = K
+    L[:n, n:] = Pmat
+    L[n:, :n] = Pmat.T
+    wx = np.linalg.lstsq(L, np.concatenate([V[:, 0], np.zeros(3)]), rcond=None)[0]
+    wy = np.linalg.lstsq(L, np.concatenate([V[:, 1], np.zeros(3)]), rcond=None)[0]
+    gx, gy = np.meshgrid(np.arange(out_w, dtype=np.float64), np.arange(out_h, dtype=np.float64))
+    fx = wx[n] + wx[n + 1] * gx + wx[n + 2] * gy
+    fy = wy[n] + wy[n + 1] * gx + wy[n + 2] * gy
+    for i in range(n):
+        u = U((gx - P[i, 0]) ** 2 + (gy - P[i, 1]) ** 2)
+        fx += wx[i] * u
+        fy += wy[i] * u
+    return fx.astype(np.float32), fy.astype(np.float32)
+
+def _warp_jpeg(jpeg_bytes, source):
+    """Entzerrt ein JPEG anhand der gespeicherten Kalibrierung der Quelle:
+    4 Punkte -> Homographie (Perspektive), 8 Punkte -> TPS (Perspektive + Verzeichnung).
+    Gibt das Bild unveraendert zurueck, falls keine Kalibrierung existiert / cv2 fehlt."""
+    calib = _load_calib().get(source)
+    if not calib or "src" not in calib:
+        return jpeg_bytes
+    try:
+        import cv2, numpy as np
+    except Exception:
+        return jpeg_bytes
+    arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return jpeg_bytes
+    out_w, out_h = int(calib["out_w"]), int(calib["out_h"])
+    src = np.array(calib["src"], dtype=np.float32)
+    dst = _bed_targets(out_w, out_h, len(src))
+    if len(src) == 4:
+        Hm = cv2.getPerspectiveTransform(src, dst)
+        warped = cv2.warpPerspective(img, Hm, (out_w, out_h))
+    else:
+        map_x, map_y = _build_tps_maps(src, dst, out_w, out_h)
+        warped = cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR,
+                           borderMode=cv2.BORDER_CONSTANT)
+    ok, buf = cv2.imencode(".jpg", warped, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return buf.tobytes() if ok else jpeg_bytes
+
+def capture_jpeg_b64(source="csi", device=0, raw=False):
+    """Nimmt ein Bild der gewaehlten Quelle auf und gibt Base64-JPEG zurueck.
+    Ist raw=False und eine Kalibrierung vorhanden, wird das Bild entzerrt."""
+    jb = _usb_capture_bytes(int(device)) if source == "usb" else _csi_capture_bytes()
+    if not raw:
+        jb = _warp_jpeg(jb, source)
+    return base64.b64encode(jb).decode("ascii")
+
+def save_camera_calibration(source, img_points, W, H):
+    """Speichert die Kalibrier-Bildpunkte (4 Ecken, optional + 4 Kantenmitten).
+    Reihenfolge: oben-links, oben-rechts, unten-rechts, unten-links,
+    [Mitte-oben, Mitte-rechts, Mitte-unten, Mitte-links]. Die eigentliche Entzerrung
+    (Homographie bei 4, TPS bei 8 Punkten) erfolgt beim Aufnehmen in _warp_jpeg."""
+    if len(img_points) not in (4, 8):
+        raise RuntimeError("Es werden 4 oder 8 Punkte benötigt.")
+    scale = 1200.0 / max(W, H)          # laengste Kante ~1200 px im entzerrten Bild
+    out_w, out_h = int(round(W * scale)), int(round(H * scale))
+    calib = _load_calib()
+    calib[source] = {"W": W, "H": H, "out_w": out_w, "out_h": out_h,
+                     "src": [[float(p[0]), float(p[1])] for p in img_points]}
+    _save_calib(calib)
+    print(f"DEBUG: Kamera-Kalibrierung gespeichert ({source}, {len(img_points)} Punkte).")
+
+_last_edge_bytes = None  # zuletzt aufgenommenes (entzerrtes) Bild für erneute Kantenerkennung
+
+def detect_edges_result(source="csi", device=0, do_capture=True,
+                        t1=50, t2=150, blur=3, min_len=40, epsilon=0.01, W=400.0, H=400.0):
+    """Nimmt (optional) ein Bild auf, fuehrt Canny-Kantenerkennung + Konturensuche durch und
+    gibt eine Vorschau (Bild mit eingezeichneten Konturen) sowie die Konturen in mm zurueck."""
+    global _last_edge_bytes
+    try:
+        import cv2, numpy as np
+    except Exception:
+        raise RuntimeError("OpenCV (cv2) nicht verfügbar – für die Kantenerkennung nötig.")
+    if do_capture or not _last_edge_bytes:
+        _last_edge_bytes = base64.b64decode(capture_jpeg_b64(source, device, raw=False))
+    arr = np.frombuffer(_last_edge_bytes, np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise RuntimeError("Bild konnte nicht dekodiert werden.")
+    ih, iw = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    k = max(1, int(blur))
+    if k % 2 == 0:
+        k += 1
+    if k > 1:
+        gray = cv2.GaussianBlur(gray, (k, k), 0)
+    edges = cv2.Canny(gray, int(t1), int(t2))
+    edges = cv2.dilate(edges, np.ones((2, 2), np.uint8), iterations=1)  # Linien leicht verbinden
+    cnts, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    preview = img.copy()
+    sx, sy = W / iw, H / ih
+    contours_mm = []
+    for c in cnts:
+        peri = cv2.arcLength(c, True)
+        if peri < float(min_len):
+            continue
+        approx = cv2.approxPolyDP(c, max(0.5, float(epsilon) * peri), True)
+        if len(approx) < 3:
+            continue
+        cv2.polylines(preview, [approx], True, (0, 255, 0), 2)
+        contours_mm.append([[round(float(p[0][0]) * sx, 2), round(float(p[0][1]) * sy, 2)] for p in approx])
+    ok, buf = cv2.imencode(".jpg", preview, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    preview_b64 = base64.b64encode(buf.tobytes()).decode("ascii") if ok else ""
+    return {"preview": "data:image/jpeg;base64," + preview_b64,
+            "contours": contours_mm, "count": len(contours_mm)}
+
+def _systemd_unit():
+    """Name der eigenen systemd-Unit (oder None), aus /proc/self/cgroup."""
+    try:
+        with open("/proc/self/cgroup") as f:
+            m = re.search(r"([\w@.\-]+\.service)", f.read())
+            return m.group(1) if m else None
+    except Exception:
+        return None
+
+def _will_restart_on_exit():
+    """True, wenn der Dienst bei sauberem Beenden von systemd neu gestartet wird
+    (Restart=always). Nur dann ist ein Selbst-Neustart für das Update sicher."""
+    unit = _systemd_unit()
+    if not unit:
+        return False
+    try:
+        r = subprocess.run(["systemctl", "show", unit, "-p", "Restart", "--value"],
+                           capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() == "always"
+    except Exception:
+        return False
 
 # --- GLOBALE VARIABLEN ---
 laser_serial = None
@@ -750,20 +916,91 @@ async def handle_client(websocket, path=None):
             elif action == "capture_camera":
                 # Standbild der Kamera aufnehmen (blockierend → in Thread auslagern).
                 # source: "csi" (Pi-Kamera/picamera2) oder "usb" (UVC/OpenCV).
+                # raw=True → ohne Entzerrung (für die Kalibrierung). tag → Routing im Frontend.
                 source = data.get("source", "csi")
+                raw_flag = bool(data.get("raw", False))
+                tag = data.get("tag", "")
+                device = data.get("device", 0)
                 try:
                     loop = asyncio.get_running_loop()
-                    if source == "usb":
-                        idx = int(data.get("device", 0))
-                        b64 = await loop.run_in_executor(None, capture_usb_jpeg, idx)
-                    else:
-                        b64 = await loop.run_in_executor(None, capture_camera_jpeg)
+                    b64 = await loop.run_in_executor(None, capture_jpeg_b64, source, device, raw_flag)
                     await websocket.send(json.dumps({"type": "camera_photo",
-                                                     "data": "data:image/jpeg;base64," + b64}))
-                    print(f"DEBUG: Kamerabild ({source}) aufgenommen und gesendet.")
+                                                     "data": "data:image/jpeg;base64," + b64, "tag": tag}))
+                    print(f"DEBUG: Kamerabild ({source}, raw={raw_flag}) aufgenommen und gesendet.")
                 except Exception as e:
                     print(f"DEBUG: Kamera-Fehler ({source}): {e}")
-                    await websocket.send(json.dumps({"type": "camera_error", "msg": str(e)}))
+                    await websocket.send(json.dumps({"type": "camera_error", "msg": str(e), "tag": tag}))
+
+            elif action == "camera_calibrate":
+                # 4-Punkt-Homographie speichern (Bildpunkte → Bett-Ecken)
+                source = data.get("source", "csi")
+                try:
+                    pts = data.get("points", [])
+                    W = float(data.get("W", 400)); H = float(data.get("H", 400))
+                    await asyncio.get_running_loop().run_in_executor(
+                        None, save_camera_calibration, source, pts, W, H)
+                    await websocket.send(json.dumps({"type": "camera_calib_done", "source": source}))
+                except Exception as e:
+                    print(f"DEBUG: Kalibrier-Fehler ({source}): {e}")
+                    await websocket.send(json.dumps({"type": "camera_error", "msg": str(e), "tag": "calib"}))
+
+            elif action == "camera_calib_clear":
+                # Kalibrierung einer Quelle entfernen
+                source = data.get("source", "csi")
+                calib = _load_calib()
+                if source in calib:
+                    del calib[source]
+                    _save_calib(calib)
+                await websocket.send(json.dumps({"type": "camera_calib_cleared", "source": source}))
+
+            elif action == "detect_edges":
+                # Kantenerkennung auf dem (entzerrten) Kamerabild → Konturen in mm
+                try:
+                    loop = asyncio.get_running_loop()
+                    p = dict(
+                        source=data.get("source", "csi"), device=data.get("device", 0),
+                        do_capture=bool(data.get("capture", True)),
+                        t1=data.get("t1", 50), t2=data.get("t2", 150), blur=data.get("blur", 3),
+                        min_len=data.get("minLen", 40), epsilon=data.get("epsilon", 0.01),
+                        W=float(data.get("W", 400)), H=float(data.get("H", 400)))
+                    res = await loop.run_in_executor(None, lambda: detect_edges_result(**p))
+                    res["type"] = "edges_result"
+                    await websocket.send(json.dumps(res))
+                    print(f"DEBUG: Kantenerkennung – {res['count']} Konturen.")
+                except Exception as e:
+                    print(f"DEBUG: Kantenerkennung-Fehler: {e}")
+                    await websocket.send(json.dumps({"type": "camera_error", "msg": str(e), "tag": "edges"}))
+
+            elif action == "update_software":
+                # git pull im Projektordner; bei systemd (Restart=always) Server neu starten
+                try:
+                    if getattr(sys, "frozen", False):
+                        await websocket.send(json.dumps({"type": "update_error",
+                            "msg": "Im EXE-Modus nicht verfügbar – bitte neue agent.exe herunterladen."}))
+                    else:
+                        repo_dir = os.path.dirname(os.path.abspath(__file__))
+                        loop = asyncio.get_running_loop()
+                        proc = await loop.run_in_executor(None, lambda: subprocess.run(
+                            ["git", "-C", repo_dir, "pull", "--ff-only"],
+                            capture_output=True, text=True, timeout=120))
+                        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+                        await websocket.send(json.dumps({"type": "update_log", "msg": out or "(keine Ausgabe)"}))
+                        if proc.returncode != 0:
+                            await websocket.send(json.dumps({"type": "update_error",
+                                "msg": out or "git pull fehlgeschlagen"}))
+                        else:
+                            # Nur selbst beenden, wenn systemd uns sicher neu startet (Restart=always),
+                            # sonst bliebe der Server unten. Sonst: manuellen Neustart melden.
+                            restart_ok = _will_restart_on_exit()
+                            await websocket.send(json.dumps({"type": "update_done", "restart": restart_ok}))
+                            if restart_ok:
+                                print("DEBUG: Update geholt – Neustart (systemd Restart=always).")
+                                loop.call_later(1.5, lambda: os._exit(0))
+                            else:
+                                print("DEBUG: Update geholt – kein Auto-Neustart (Restart!=always).")
+                except Exception as e:
+                    print(f"DEBUG: Update-Fehler: {e}")
+                    await websocket.send(json.dumps({"type": "update_error", "msg": str(e)}))
 
             elif action == "disconnect":
                 print("DEBUG: Trenne Laser-Verbindung...")

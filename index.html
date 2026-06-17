@@ -264,6 +264,26 @@
             justify-content: center;
             margin-bottom: 10px;
         }
+        /* Marker-Punkte in der Kamera-Kalibrierung */
+        .calib-marker {
+            position: absolute; width: 22px; height: 22px;
+            margin-left: -11px; margin-top: -11px;
+            border: 2px solid #00eeff; border-radius: 50%;
+            background: rgba(0,238,255,0.25);
+            color: #fff; font-size: 12px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; box-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
+        /* Fadenkreuz-Hinweis an den Kantenmitten (gelb) */
+        .calib-guide {
+            position: absolute; width: 34px; height: 34px;
+            margin-left: -17px; margin-top: -17px; pointer-events: none;
+        }
+        .calib-guide::before, .calib-guide::after {
+            content: ''; position: absolute; background: #ffcc00; box-shadow: 0 0 3px rgba(0,0,0,0.8);
+        }
+        .calib-guide::before { left: 50%; top: 0; width: 1px; height: 100%; transform: translateX(-0.5px); }
+        .calib-guide::after  { top: 50%; left: 0; height: 1px; width: 100%; transform: translateY(-0.5px); }
         /* Kettensymbole monochrom erzwingen (Symbol-Font statt Emoji-Font) */
         .icon-btn.mono {
             font-family: "Segoe UI Symbol", "Segoe UI", sans-serif;
@@ -342,6 +362,9 @@
                 <button onclick="disconnectLaser()" data-i18n="machine.disconnect" data-i18n-title="machine.disconnect" title="Trennen" style="flex: 1; padding: 8px 2px; font-size: 12px;">🛑 Trennen</button>
                 <button id="btnLoadData" onclick="loadMachineData()" data-i18n="machine.data" data-i18n-title="machine.dataTip" title="Lese Daten ($$)" style="flex: 1; padding: 8px 2px; font-size: 12px; background: #27ae60; opacity: 0.3;" disabled>📡 Daten</button>
             </div>
+
+            <button onclick="updateSoftware()" data-i18n-title="upd.tip" title="Software vom GitHub aktualisieren (Server startet neu)"
+                    style="margin-top: 10px; width: 100%; padding: 7px; background: #34495e; color: #fff; border: 1px solid #4a627a; border-radius: 4px; cursor: pointer; font-size: 12px;" data-i18n="upd.btn">⟳ Software aktualisieren</button>
 
         </div>
 
@@ -439,6 +462,17 @@
                 <div style="border-left: 1px solid #555; margin: 0 5px;"></div>
                 <button onclick="activateMoveMode()" data-i18n-title="ws.moveLaser" title="Laser hierhin fahren" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #e74c3c;">🎯</button>
                 <button onclick="activateOriginMode()" data-i18n-title="ws.setOrigin" title="Nullpunkt hier setzen" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #9b59b6;">📍</button>
+                <div style="border-left: 1px solid #555; margin: 0 5px;"></div>
+                <!-- Kamera-Hintergrundbild (CSI / USB) -->
+                <select id="camSource" onchange="localStorage.setItem('camSource', this.value)" data-i18n-title="cam.source" title="Kameraquelle"
+                        style="width: auto; margin: 0; padding: 4px 4px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
+                    <option value="csi" data-i18n="cam.srcCsi">Pi-Kamera (CSI)</option>
+                    <option value="usb" data-i18n="cam.srcUsb">USB-Kamera</option>
+                </select>
+                <button onclick="captureCameraBg()" data-i18n-title="cam.captureTip" title="Kamerabild aufnehmen" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #8e44ad;">📷</button>
+                <button onclick="openCamCalib()" data-i18n-title="calib.btnTip" title="Kamera kalibrieren" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #2c3e50;">⌖</button>
+                <button id="camRemoveBtn" onclick="removeCameraBg()" data-i18n-title="cam.removeTip" title="Kamerabild entfernen" class="icon-btn" disabled style="width: 32px; height: 32px; font-size: 14px; background: #555;">✕</button>
+                <input type="range" id="camOpacity" min="10" max="90" value="45" oninput="setCameraBgOpacity(this.value)" data-i18n-title="cam.opacity" title="Transparenz" style="display: none; width: 70px; margin: 0;">
             </div>
         </div>
 
@@ -513,6 +547,7 @@
             <div style="font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 3px 2px;" data-i18n="tools.genGroup">Generatoren / Gruppieren</div>
             <div class="tool-row" style="margin-bottom: 8px;">
                 <button class="icon-btn" onclick="openBoxDialog()" data-i18n-title="tools.box" title="Box-Generator (Finger-Joint)">▣</button>
+                <button class="icon-btn" onclick="openEdgeDialog()" data-i18n-title="edge.btnTip" title="Kantenerkennung → Vektor">⚲</button>
                 <button class="icon-btn" onclick="openArrayDialog()" data-i18n-title="tools.array" title="Raster-Kopie (Array)">▦</button>
                 <div style="border-left: 1px solid #555; margin: 0 4px;"></div>
                 <button class="icon-btn mono" onclick="groupSelection()" data-i18n-title="tools.group" title="Auswahl gruppieren">⛓</button>
@@ -545,25 +580,6 @@
                     🖼️ Bild
                 </button>
                 <input type="file" id="photoUpload" accept="image/*" style="display: none;">
-            </div>
-
-            <!-- Kamera-Hintergrundbild (Pi-Kamera über CSI oder USB-Kamera) -->
-            <div style="display: flex; gap: 5px; margin-top: 6px; align-items: center;">
-                <select id="camSource" onchange="localStorage.setItem('camSource', this.value)" data-i18n-title="cam.source" title="Kameraquelle"
-                        style="background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 12px; padding: 7px 4px;">
-                    <option value="csi" data-i18n="cam.srcCsi">Pi-Kamera (CSI)</option>
-                    <option value="usb" data-i18n="cam.srcUsb">USB-Kamera</option>
-                </select>
-                <button onclick="captureCameraBg()" data-i18n-title="cam.captureTip" title="Kamerabild aufnehmen"
-                        style="flex: 1; background: #8e44ad; color: #fff; border: none; padding: 8px; margin: 0; box-sizing: border-box; text-align: center; cursor: pointer; border-radius: 4px; font-size: 13px;" data-i18n="cam.capture">
-                    📷 Kamerabild
-                </button>
-                <button id="camRemoveBtn" onclick="removeCameraBg()" data-i18n-title="cam.removeTip" title="Kamerabild entfernen" disabled
-                        style="background: #555; color: #fff; border: none; padding: 8px 10px; margin: 0; cursor: pointer; border-radius: 4px; font-size: 13px;">✕</button>
-            </div>
-            <div id="camOpacityRow" style="display: none; align-items: center; gap: 6px; margin-top: 4px; font-size: 11px; color: #aaa;">
-                <span data-i18n="cam.opacity">Transparenz</span>
-                <input type="range" id="camOpacity" min="10" max="90" value="45" oninput="setCameraBgOpacity(this.value)" style="flex: 1;">
             </div>
         </div>
 
@@ -1098,6 +1114,65 @@
       <div style="display:flex; gap:8px; margin-top:16px;">
         <button onclick="closePhotoDialog()" style="margin-left:auto; background:#555; color:#fff; border:none; padding:9px 16px; border-radius:5px; cursor:pointer;" data-i18n="common.close">Schließen</button>
       </div>
+    </div>
+
+    <!-- KAMERA-KALIBRIERUNG (4-Punkt-Homographie) -->
+    <div id="camCalibDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; border: 2px solid #8e44ad; padding: 18px; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.6); z-index: 3200; width: 580px; max-width: 94vw; font-family: sans-serif; color: #fff;">
+        <h3 style="margin-top: 0; padding-bottom: 8px; border-bottom: 1px solid #444; font-size: 15px; color: #b07cc6;" data-i18n="calib.title">⌖ Kamera kalibrieren</h3>
+        <div style="font-size: 12px; color: #ccc; margin: 8px 0;" data-i18n-html="calib.intro">
+            Setze <b>physische Marker</b> an die 8 Positionen (4 Ecken + 4 Kantenmitten), nimm ein Foto auf und klicke
+            sie der Reihe nach an: zuerst die 4 <b>Ecken</b> (oben-links, oben-rechts, unten-rechts, unten-links),
+            dann die 4 <b>Kantenmitten</b> (oben, rechts, unten, links). Die gelben Fadenkreuze zeigen, wo die Mitten
+            ungefähr liegen.
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+            <button onclick="calibCapture()" style="background: #8e44ad; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;" data-i18n="calib.capture">📷 Foto aufnehmen</button>
+            <button onclick="resetCalibPoints()" style="background: #555; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;" data-i18n="calib.reset">↺ Punkte zurücksetzen</button>
+            <span id="camCalibStatus" style="font-size: 12px; color: #e67e22; margin-left: auto;"></span>
+        </div>
+        <div id="camCalibImgWrap" style="position: relative; display: inline-block; max-width: 100%; border: 1px solid #444; background: #111; line-height: 0;">
+            <img id="camCalibImg" onclick="_calibImgClick(event)" style="display: none; max-width: 540px; max-height: 60vh; cursor: crosshair;">
+            <div id="camCalibPlaceholder" style="padding: 40px 20px; font-size: 12px; color: #777; text-align: center;" data-i18n="calib.noPhoto">Noch kein Foto – „Foto aufnehmen" drücken.</div>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 14px; align-items: center;">
+            <button onclick="clearCamCalib()" style="background: #7f3b3b; color: #fff; border: none; padding: 9px 14px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="calib.clear">Kalibrierung entfernen</button>
+            <button id="camCalibSave" onclick="saveCamCalib()" disabled style="margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="calib.save">💾 Kalibrierung speichern</button>
+            <button onclick="closeCamCalib()" style="background: #555; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="common.close">Schließen</button>
+        </div>
+    </div>
+
+    <!-- KANTENERKENNUNG → VEKTOR -->
+    <div id="edgeDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; border: 2px solid #16785f; padding: 18px; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.6); z-index: 3200; width: 620px; max-width: 94vw; font-family: sans-serif; color: #fff;">
+        <h3 style="margin-top: 0; padding-bottom: 8px; border-bottom: 1px solid #444; font-size: 15px; color: #3fc79f;" data-i18n="edge.title">🔍 Kantenerkennung → Vektor</h3>
+        <div style="font-size: 12px; color: #ccc; margin: 8px 0;" data-i18n="edge.intro">
+            Lege ein Blatt/Objekt mit der gewünschten Form in den Arbeitsbereich, nimm ein Foto auf und passe die Regler an, bis die Kanten gut erkannt sind. „Als Vektor übernehmen" fügt die Konturen als bearbeitbare Schnittobjekte ein.
+        </div>
+        <div style="display: flex; gap: 14px;">
+            <div style="flex: 0 0 300px;">
+                <button onclick="edgeDetect(true)" style="width: 100%; background: #16785f; color: #fff; border: none; padding: 9px; border-radius: 4px; cursor: pointer; font-size: 13px;" data-i18n="edge.capture">📷 Aufnehmen &amp; erkennen</button>
+                <div style="margin-top: 10px; font-size: 11px; color: #aaa;">
+                    <label data-i18n="edge.t1">Kanten min</label> <span id="edgeT1Val">50</span>
+                    <input type="range" id="edgeT1" min="0" max="300" value="50" oninput="document.getElementById('edgeT1Val').textContent=this.value; edgeRedetect()" style="width:100%;">
+                    <label data-i18n="edge.t2">Kanten max</label> <span id="edgeT2Val">150</span>
+                    <input type="range" id="edgeT2" min="0" max="500" value="150" oninput="document.getElementById('edgeT2Val').textContent=this.value; edgeRedetect()" style="width:100%;">
+                    <label data-i18n="edge.blur">Glättung</label> <span id="edgeBlurVal">3</span>
+                    <input type="range" id="edgeBlur" min="1" max="15" step="2" value="3" oninput="document.getElementById('edgeBlurVal').textContent=this.value; edgeRedetect()" style="width:100%;">
+                    <label data-i18n="edge.minLen">Min. Länge (px)</label> <span id="edgeMinLenVal">40</span>
+                    <input type="range" id="edgeMinLen" min="5" max="400" value="40" oninput="document.getElementById('edgeMinLenVal').textContent=this.value; edgeRedetect()" style="width:100%;">
+                    <label data-i18n="edge.simplify">Vereinfachung</label> <span id="edgeEpsVal">10</span>
+                    <input type="range" id="edgeEps" min="1" max="50" value="10" oninput="document.getElementById('edgeEpsVal').textContent=this.value; edgeRedetect()" style="width:100%;">
+                </div>
+                <div id="edgeStatus" style="font-size: 12px; color: #3fc79f; margin-top: 8px;"></div>
+            </div>
+            <div id="edgeImgWrap" style="flex: 1; min-width: 0; border: 1px solid #444; background: #111; display: flex; align-items: center; justify-content: center;">
+                <img id="edgeImg" style="display: none; max-width: 100%; max-height: 60vh;">
+                <div id="edgePlaceholder" style="padding: 30px 10px; font-size: 12px; color: #777; text-align: center;" data-i18n="edge.noPhoto">Noch kein Foto.</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 14px; align-items: center;">
+            <button id="edgeApply" onclick="applyEdges()" disabled style="margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="edge.apply">✅ Als Vektor übernehmen</button>
+            <button onclick="closeEdgeDialog()" style="background: #555; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="common.close">Schließen</button>
+        </div>
     </div>
 
     <div id="textDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; border: 2px solid #007acc; padding: 20px; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.6); z-index: 3000; width: 360px; font-family: sans-serif; color: #fff;">
@@ -4295,6 +4370,23 @@
                 'cam.removeTip':'Kamerabild entfernen', 'cam.opacity':'Transparenz',
                 'cam.loading':'Kamerabild wird aufgenommen…', 'cam.ok':'Kamerabild als Hintergrund eingeblendet.',
                 'cam.error':'Kamera-Fehler:', 'cam.source':'Kameraquelle', 'cam.srcCsi':'Pi-Kamera (CSI)', 'cam.srcUsb':'USB-Kamera',
+                'calib.btnTip':'Kamera kalibrieren', 'calib.title':'⌖ Kamera kalibrieren',
+                'calib.intro':'Setze <b>physische Marker</b> an die 8 Positionen (4 Ecken + 4 Kantenmitten), nimm ein Foto auf und klicke sie der Reihe nach an: zuerst die 4 <b>Ecken</b> (oben-links, oben-rechts, unten-rechts, unten-links), dann die 4 <b>Kantenmitten</b> (oben, rechts, unten, links). Die gelben Fadenkreuze zeigen, wo die Mitten ungefähr liegen. Danach wird jedes Kamerabild passgenau entzerrt.',
+                'calib.capture':'📷 Foto aufnehmen', 'calib.reset':'↺ Punkte zurücksetzen', 'calib.noPhoto':'Noch kein Foto – „Foto aufnehmen" drücken.',
+                'calib.clear':'Kalibrierung entfernen', 'calib.save':'💾 Kalibrierung speichern',
+                'calib.stepCorner':'Ecke {n}/4 anklicken', 'calib.stepMid':'Kantenmitte {n}/4 anklicken (gelbes Fadenkreuz)', 'calib.ready':'8/8 – bereit zum Speichern',
+                'calib.done':'Kamera kalibriert – Bilder werden jetzt entzerrt.', 'calib.cleared':'Kalibrierung entfernt.',
+                'edge.btnTip':'Kantenerkennung → Vektor', 'edge.title':'🔍 Kantenerkennung → Vektor',
+                'edge.intro':'Lege ein Blatt/Objekt mit der gewünschten Form in den Arbeitsbereich, nimm ein Foto auf und passe die Regler an, bis die Kanten gut erkannt sind. „Als Vektor übernehmen" fügt die Konturen als bearbeitbare Schnittobjekte ein.',
+                'edge.capture':'📷 Aufnehmen & erkennen', 'edge.t1':'Kanten min', 'edge.t2':'Kanten max', 'edge.blur':'Glättung',
+                'edge.minLen':'Min. Länge (px)', 'edge.simplify':'Vereinfachung', 'edge.apply':'✅ Als Vektor übernehmen',
+                'edge.noPhoto':'Noch kein Foto.', 'edge.count':'{n} Konturen gefunden', 'edge.detecting':'Kantenerkennung läuft…',
+                'edge.applied':'{n} Konturen als Schnittobjekte eingefügt.',
+                'upd.btn':'⟳ Software aktualisieren', 'upd.tip':'Neueste Version von GitHub holen (Server startet neu)',
+                'upd.confirm':'Software jetzt von GitHub aktualisieren? Der Server startet danach neu und die Seite wird neu geladen.',
+                'upd.start':'Update wird geholt (git pull)…', 'upd.error':'Update-Fehler:',
+                'upd.restarting':'Update erfolgreich – Server startet neu.', 'upd.reloadIn':'Seite wird in {n} s neu geladen…',
+                'upd.manual':'Update geholt. Bitte den WebLaser-Dienst/das Programm manuell neu starten.',
                 'panel.objects':'📋 Objekte & Ebenen', 'obj.type':'Typ', 'obj.action':'Aktion',
                 'panel.layerParams':'⚙️ Ebenen-Parameter', 'mat.lib':'📚 Materialbibliothek', 'mat.libTip':'Materialbibliothek öffnen',
                 'layer.order':'Abarbeitungs-Reihenfolge:', 'layer.engraveFirst':'1. Gravieren, dann Schneiden (Empfohlen)',
@@ -4341,6 +4433,23 @@
                 'cam.removeTip':'Remove camera image', 'cam.opacity':'Opacity',
                 'cam.loading':'Capturing camera image…', 'cam.ok':'Camera image shown as background.',
                 'cam.error':'Camera error:', 'cam.source':'Camera source', 'cam.srcCsi':'Pi camera (CSI)', 'cam.srcUsb':'USB camera',
+                'calib.btnTip':'Calibrate camera', 'calib.title':'⌖ Calibrate camera',
+                'calib.intro':'Place <b>physical markers</b> at the 8 positions (4 corners + 4 edge midpoints), capture a photo and click them in order: first the 4 <b>corners</b> (top-left, top-right, bottom-right, bottom-left), then the 4 <b>edge midpoints</b> (top, right, bottom, left). The yellow crosshairs show roughly where the midpoints are. After that every camera image is rectified.',
+                'calib.capture':'📷 Capture photo', 'calib.reset':'↺ Reset points', 'calib.noPhoto':'No photo yet – press "Capture photo".',
+                'calib.clear':'Remove calibration', 'calib.save':'💾 Save calibration',
+                'calib.stepCorner':'Click corner {n}/4', 'calib.stepMid':'Click edge midpoint {n}/4 (yellow crosshair)', 'calib.ready':'8/8 – ready to save',
+                'calib.done':'Camera calibrated – images are now rectified.', 'calib.cleared':'Calibration removed.',
+                'edge.btnTip':'Edge detection → vector', 'edge.title':'🔍 Edge detection → vector',
+                'edge.intro':'Place a sheet/object with the desired shape in the work area, capture a photo and adjust the sliders until the edges are detected well. "Apply as vector" inserts the contours as editable cut objects.',
+                'edge.capture':'📷 Capture & detect', 'edge.t1':'Edge min', 'edge.t2':'Edge max', 'edge.blur':'Smoothing',
+                'edge.minLen':'Min. length (px)', 'edge.simplify':'Simplify', 'edge.apply':'✅ Apply as vector',
+                'edge.noPhoto':'No photo yet.', 'edge.count':'{n} contours found', 'edge.detecting':'Detecting edges…',
+                'edge.applied':'{n} contours inserted as cut objects.',
+                'upd.btn':'⟳ Update software', 'upd.tip':'Fetch the latest version from GitHub (server restarts)',
+                'upd.confirm':'Update the software from GitHub now? The server will restart afterwards and the page will reload.',
+                'upd.start':'Fetching update (git pull)…', 'upd.error':'Update error:',
+                'upd.restarting':'Update successful – server is restarting.', 'upd.reloadIn':'Reloading page in {n} s…',
+                'upd.manual':'Update fetched. Please restart the WebLaser service/program manually.',
                 'panel.objects':'📋 Objects & Layers', 'obj.type':'Type', 'obj.action':'Action',
                 'panel.layerParams':'⚙️ Layer parameters', 'mat.lib':'📚 Material library', 'mat.libTip':'Open material library',
                 'layer.order':'Processing order:', 'layer.engraveFirst':'1. Engrave, then cut (recommended)',
@@ -4387,6 +4496,23 @@
                 'cam.removeTip':'Quitar imagen de la cámara', 'cam.opacity':'Opacidad',
                 'cam.loading':'Capturando imagen de la cámara…', 'cam.ok':'Imagen de la cámara mostrada de fondo.',
                 'cam.error':'Error de cámara:', 'cam.source':'Fuente de cámara', 'cam.srcCsi':'Cámara Pi (CSI)', 'cam.srcUsb':'Cámara USB',
+                'calib.btnTip':'Calibrar cámara', 'calib.title':'⌖ Calibrar cámara',
+                'calib.intro':'Coloca <b>marcadores físicos</b> en las 8 posiciones (4 esquinas + 4 puntos medios de los bordes), captura una foto y haz clic en ellos en orden: primero las 4 <b>esquinas</b> (sup-izq, sup-der, inf-der, inf-izq), luego los 4 <b>puntos medios</b> (arriba, derecha, abajo, izquierda). Las cruces amarillas indican dónde están aproximadamente. Después, cada imagen se rectifica.',
+                'calib.capture':'📷 Capturar foto', 'calib.reset':'↺ Reiniciar puntos', 'calib.noPhoto':'Aún no hay foto: pulsa «Capturar foto».',
+                'calib.clear':'Quitar calibración', 'calib.save':'💾 Guardar calibración',
+                'calib.stepCorner':'Haz clic en la esquina {n}/4', 'calib.stepMid':'Haz clic en el punto medio {n}/4 (cruz amarilla)', 'calib.ready':'8/8 – listo para guardar',
+                'calib.done':'Cámara calibrada: las imágenes se rectifican.', 'calib.cleared':'Calibración eliminada.',
+                'edge.btnTip':'Detección de bordes → vector', 'edge.title':'🔍 Detección de bordes → vector',
+                'edge.intro':'Coloca una hoja/objeto con la forma deseada en el área de trabajo, captura una foto y ajusta los controles hasta detectar bien los bordes. «Aplicar como vector» inserta los contornos como objetos de corte editables.',
+                'edge.capture':'📷 Capturar y detectar', 'edge.t1':'Borde mín', 'edge.t2':'Borde máx', 'edge.blur':'Suavizado',
+                'edge.minLen':'Long. mín (px)', 'edge.simplify':'Simplificar', 'edge.apply':'✅ Aplicar como vector',
+                'edge.noPhoto':'Aún no hay foto.', 'edge.count':'{n} contornos encontrados', 'edge.detecting':'Detectando bordes…',
+                'edge.applied':'{n} contornos insertados como objetos de corte.',
+                'upd.btn':'⟳ Actualizar software', 'upd.tip':'Obtener la última versión de GitHub (el servidor se reinicia)',
+                'upd.confirm':'¿Actualizar el software desde GitHub ahora? El servidor se reiniciará y la página se recargará.',
+                'upd.start':'Obteniendo actualización (git pull)…', 'upd.error':'Error de actualización:',
+                'upd.restarting':'Actualización correcta: el servidor se reinicia.', 'upd.reloadIn':'Recargando la página en {n} s…',
+                'upd.manual':'Actualización obtenida. Reinicia el servicio/programa WebLaser manualmente.',
                 'panel.objects':'📋 Objetos y capas', 'obj.type':'Tipo', 'obj.action':'Acción',
                 'panel.layerParams':'⚙️ Parámetros de capa', 'mat.lib':'📚 Biblioteca de materiales', 'mat.libTip':'Abrir biblioteca de materiales',
                 'layer.order':'Orden de procesamiento:', 'layer.engraveFirst':'1. Grabar, luego cortar (recomendado)',
@@ -4433,6 +4559,23 @@
                 'cam.removeTip':'移除摄像头图像', 'cam.opacity':'透明度',
                 'cam.loading':'正在拍摄摄像头图像…', 'cam.ok':'摄像头图像已作为背景显示。',
                 'cam.error':'摄像头错误：', 'cam.source':'摄像头来源', 'cam.srcCsi':'Pi 摄像头 (CSI)', 'cam.srcUsb':'USB 摄像头',
+                'calib.btnTip':'校准摄像头', 'calib.title':'⌖ 校准摄像头',
+                'calib.intro':'在 8 个位置（4 个角 + 4 条边的中点）放置<b>实物标记</b>，拍摄照片后按顺序点击：先点 4 个<b>角</b>（左上、右上、右下、左下），再点 4 个<b>边中点</b>（上、右、下、左）。黄色十字显示中点的大致位置。之后每张图像都会被校正。',
+                'calib.capture':'📷 拍摄照片', 'calib.reset':'↺ 重置点', 'calib.noPhoto':'尚无照片 – 请点击“拍摄照片”。',
+                'calib.clear':'移除校准', 'calib.save':'💾 保存校准',
+                'calib.stepCorner':'点击第 {n}/4 个角', 'calib.stepMid':'点击第 {n}/4 个边中点（黄色十字）', 'calib.ready':'8/8 – 可以保存',
+                'calib.done':'摄像头已校准 – 图像将被校正。', 'calib.cleared':'已移除校准。',
+                'edge.btnTip':'边缘检测 → 矢量', 'edge.title':'🔍 边缘检测 → 矢量',
+                'edge.intro':'将带有目标形状的纸张/物体放入工作区，拍摄照片并调整滑块，直到边缘被很好地识别。“应用为矢量”会将轮廓作为可编辑的切割对象插入。',
+                'edge.capture':'📷 拍摄并检测', 'edge.t1':'边缘最小', 'edge.t2':'边缘最大', 'edge.blur':'平滑',
+                'edge.minLen':'最小长度 (px)', 'edge.simplify':'简化', 'edge.apply':'✅ 应用为矢量',
+                'edge.noPhoto':'尚无照片。', 'edge.count':'找到 {n} 条轮廓', 'edge.detecting':'正在检测边缘…',
+                'edge.applied':'已插入 {n} 条轮廓作为切割对象。',
+                'upd.btn':'⟳ 更新软件', 'upd.tip':'从 GitHub 获取最新版本（服务器将重启）',
+                'upd.confirm':'现在从 GitHub 更新软件吗？随后服务器将重启并重新加载页面。',
+                'upd.start':'正在获取更新 (git pull)…', 'upd.error':'更新错误：',
+                'upd.restarting':'更新成功 – 服务器正在重启。', 'upd.reloadIn':'{n} 秒后重新加载页面…',
+                'upd.manual':'已获取更新。请手动重启 WebLaser 服务/程序。',
                 'panel.objects':'📋 对象与图层', 'obj.type':'类型', 'obj.action':'操作',
                 'panel.layerParams':'⚙️ 图层参数', 'mat.lib':'📚 材料库', 'mat.libTip':'打开材料库',
                 'layer.order':'处理顺序：', 'layer.engraveFirst':'1. 先雕刻，后切割 (推荐)',
@@ -4809,7 +4952,7 @@
                 _cameraBg = img;
                 let btn = document.getElementById('camRemoveBtn');
                 btn.disabled = false; btn.style.background = '#c0392b';
-                document.getElementById('camOpacityRow').style.display = 'flex';
+                document.getElementById('camOpacity').style.display = 'inline-block';
                 canvas.renderAll();
                 logMessage("SYSTEM", t('cam.ok'), "#8e44ad");
             });
@@ -4823,8 +4966,168 @@
             if (_cameraBg) { canvas.remove(_cameraBg); _cameraBg = null; canvas.renderAll(); }
             let btn = document.getElementById('camRemoveBtn');
             if (btn) { btn.disabled = true; btn.style.background = '#555'; }
-            let row = document.getElementById('camOpacityRow');
-            if (row) row.style.display = 'none';
+            let op = document.getElementById('camOpacity');
+            if (op) op.style.display = 'none';
+        }
+
+        // --- KAMERA-KALIBRIERUNG (8 Punkte: 4 Ecken + 4 Kantenmitten, TPS-Entzerrung) ---
+        const CALIB_N = 8;       // benötigte Punkte
+        let _calibPoints = [];   // angeklickte Punkte [{px,py (Bildpixel), dx,dy (angezeigt)}, ...]
+
+        function openCamCalib() { document.getElementById('camCalibDialog').style.display = 'block'; updateCalibStatus(); }
+        function closeCamCalib() { document.getElementById('camCalibDialog').style.display = 'none'; }
+
+        function calibCapture() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) { alert("Keine Verbindung zum Agenten!"); return; }
+            let source = (document.getElementById('camSource') || {}).value || 'csi';
+            logMessage("SYSTEM", t('cam.loading'), "#8e44ad");
+            // raw=true → unverzerrtes Bild zum Anklicken der Punkte
+            ws.send(JSON.stringify({ action: "capture_camera", source: source, raw: true, tag: "calib" }));
+        }
+
+        // Wird aus ws.onmessage bei camera_photo mit tag==='calib' aufgerufen
+        function _showCalibPhoto(dataUrl) {
+            let img = document.getElementById('camCalibImg');
+            let ph = document.getElementById('camCalibPlaceholder');
+            img.src = dataUrl;
+            img.style.display = 'block';
+            if (ph) ph.style.display = 'none';
+            resetCalibPoints();
+        }
+
+        function resetCalibPoints() {
+            _calibPoints = [];
+            document.querySelectorAll('#camCalibImgWrap .calib-marker, #camCalibImgWrap .calib-guide').forEach(m => m.remove());
+            updateCalibStatus();
+        }
+
+        function _calibImgClick(e) {
+            let img = document.getElementById('camCalibImg');
+            if (!img.src || _calibPoints.length >= CALIB_N) return;
+            let r = img.getBoundingClientRect();
+            let dx = e.clientX - r.left, dy = e.clientY - r.top;
+            // angezeigte Koordinaten → Original-Bildpixel
+            let px = dx * (img.naturalWidth / r.width);
+            let py = dy * (img.naturalHeight / r.height);
+            _calibPoints.push({ px: px, py: py, dx: dx, dy: dy });
+            let m = document.createElement('div');
+            m.className = 'calib-marker';
+            m.textContent = _calibPoints.length;
+            m.style.left = dx + 'px';
+            m.style.top = dy + 'px';
+            document.getElementById('camCalibImgWrap').appendChild(m);
+            // Nach den 4 Ecken die Kantenmitten als Fadenkreuz-Hinweise einblenden
+            if (_calibPoints.length === 4) _drawCalibGuides();
+            updateCalibStatus();
+        }
+
+        // Fadenkreuze an den (geraden) Kantenmitten zwischen den geklickten Ecken
+        function _drawCalibGuides() {
+            let c = _calibPoints; // 0=TL,1=TR,2=BR,3=BL (angezeigte dx/dy)
+            let mids = [
+                { dx: (c[0].dx + c[1].dx) / 2, dy: (c[0].dy + c[1].dy) / 2 }, // oben
+                { dx: (c[1].dx + c[2].dx) / 2, dy: (c[1].dy + c[2].dy) / 2 }, // rechts
+                { dx: (c[2].dx + c[3].dx) / 2, dy: (c[2].dy + c[3].dy) / 2 }, // unten
+                { dx: (c[3].dx + c[0].dx) / 2, dy: (c[3].dy + c[0].dy) / 2 }  // links
+            ];
+            let wrap = document.getElementById('camCalibImgWrap');
+            mids.forEach((p, i) => {
+                let g = document.createElement('div');
+                g.className = 'calib-guide';
+                g.dataset.num = (5 + i);
+                g.style.left = p.dx + 'px';
+                g.style.top = p.dy + 'px';
+                wrap.appendChild(g);
+            });
+        }
+
+        function updateCalibStatus() {
+            let n = _calibPoints.length;
+            let el = document.getElementById('camCalibStatus');
+            if (el) {
+                if (n >= CALIB_N) el.textContent = t('calib.ready');
+                else if (n < 4)   el.textContent = t('calib.stepCorner').replace('{n}', n + 1);
+                else              el.textContent = t('calib.stepMid').replace('{n}', n - 3);
+            }
+            document.getElementById('camCalibSave').disabled = (n < CALIB_N);
+        }
+
+        function saveCamCalib() {
+            if (_calibPoints.length < CALIB_N) return;
+            let source = (document.getElementById('camSource') || {}).value || 'csi';
+            ws.send(JSON.stringify({
+                action: "camera_calibrate", source: source,
+                points: _calibPoints.map(p => [p.px, p.py]),
+                W: workspaceWidth, H: workspaceHeight
+            }));
+        }
+
+        function clearCamCalib() {
+            let source = (document.getElementById('camSource') || {}).value || 'csi';
+            ws.send(JSON.stringify({ action: "camera_calib_clear", source: source }));
+        }
+
+        // --- KANTENERKENNUNG → VEKTOR (Stufe 3) ---
+        let _edgeContours = null;   // zuletzt erkannte Konturen (mm) [[ [x,y], ... ], ...]
+        let _edgeHasPhoto = false;  // wurde schon ein Foto aufgenommen?
+        let _edgeReTimer = null;    // Debounce für Live-Neuerkennung
+
+        function openEdgeDialog() { document.getElementById('edgeDialog').style.display = 'block'; }
+        function closeEdgeDialog() { document.getElementById('edgeDialog').style.display = 'none'; }
+
+        function edgeDetect(doCapture) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) { alert("Keine Verbindung zum Agenten!"); return; }
+            if (!doCapture && !_edgeHasPhoto) return;
+            let g = id => parseFloat(document.getElementById(id).value);
+            let source = (document.getElementById('camSource') || {}).value || 'csi';
+            logMessage("SYSTEM", t('edge.detecting'), "#16785f");
+            ws.send(JSON.stringify({
+                action: "detect_edges", source: source, capture: !!doCapture,
+                t1: g('edgeT1'), t2: g('edgeT2'), blur: g('edgeBlur'),
+                minLen: g('edgeMinLen'), epsilon: g('edgeEps') / 1000,
+                W: workspaceWidth, H: workspaceHeight
+            }));
+        }
+        // Regleränderung → entzerrtes Bild erneut analysieren (ohne Neuaufnahme), entprellt
+        function edgeRedetect() {
+            if (!_edgeHasPhoto) return;
+            if (_edgeReTimer) clearTimeout(_edgeReTimer);
+            _edgeReTimer = setTimeout(() => edgeDetect(false), 250);
+        }
+
+        // Wird aus ws.onmessage bei 'edges_result' aufgerufen
+        function _showEdgeResult(data) {
+            _edgeHasPhoto = true;
+            _edgeContours = data.contours || [];
+            let img = document.getElementById('edgeImg');
+            let ph = document.getElementById('edgePlaceholder');
+            img.src = data.preview;
+            img.style.display = 'block';
+            if (ph) ph.style.display = 'none';
+            document.getElementById('edgeStatus').textContent = t('edge.count').replace('{n}', data.count || 0);
+            document.getElementById('edgeApply').disabled = !(data.count > 0);
+        }
+
+        function applyEdges() {
+            if (!_edgeContours || !_edgeContours.length) return;
+            let style = { stroke: '#e74c3c', strokeWidth: 2, fill: 'transparent',
+                          laserMode: 'cut', cornerColor: 'blue', transparentCorners: false };
+            let created = [];
+            _edgeContours.forEach(pts => {
+                if (!pts || pts.length < 3) return;
+                let poly = new fabric.Polygon(pts.map(p => ({ x: p[0], y: p[1] })), style);
+                poly.laserMode = 'cut';
+                canvas.add(poly);
+                created.push(poly);
+            });
+            canvas.discardActiveObject();
+            if (created.length === 1) canvas.setActiveObject(created[0]);
+            else if (created.length > 1) canvas.setActiveObject(new fabric.ActiveSelection(created, { canvas: canvas }));
+            if (typeof updateObjectTable === "function") updateObjectTable();
+            if (typeof updateAllStrokes === "function") updateAllStrokes();
+            canvas.renderAll();
+            logMessage("SYSTEM", t('edge.applied').replace('{n}', created.length), "#27ae60");
+            closeEdgeDialog();
         }
 
         // --- OBJEKTE SICHER LÖSCHEN (Button & Taste) ---
@@ -4858,13 +5161,21 @@
 
         let laserFont = null;
         
-        function loadMachineData() { 
+        function loadMachineData() {
             if(ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ action: "send_gcode", command: "$$" })); 
-                logMessage("USER", "$$ (Maschinendaten laden)", "#27ae60"); 
+                ws.send(JSON.stringify({ action: "send_gcode", command: "$$" }));
+                logMessage("USER", "$$ (Maschinendaten laden)", "#27ae60");
             } else {
                 alert("Bitte zuerst mit dem Laser verbinden!");
             }
+        }
+
+        // --- SOFTWARE-UPDATE über die Web-UI (git pull auf dem Pi + Neustart) ---
+        function updateSoftware() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) { alert("Keine Verbindung zum Agenten!"); return; }
+            if (!confirm(t('upd.confirm'))) return;
+            logMessage("SYSTEM", t('upd.start'), "#34495e");
+            ws.send(JSON.stringify({ action: "update_software" }));
         }
 
         function requestPorts() {
@@ -5832,10 +6143,37 @@
                     let icon = document.getElementById('machineStatusIcon');
                     if (icon) icon.title = txt;
                 } else if (data.type === 'camera_photo') {
-                    _placeCameraBg(data.data);
+                    if (data.tag === 'calib') _showCalibPhoto(data.data);
+                    else _placeCameraBg(data.data);
                 } else if (data.type === 'camera_error') {
                     logMessage("ERROR", t('cam.error') + ' ' + (data.msg || ''), "red");
                     alert(t('cam.error') + '\n\n' + (data.msg || ''));
+                } else if (data.type === 'camera_calib_done') {
+                    logMessage("SYSTEM", t('calib.done'), "#27ae60");
+                    closeCamCalib();
+                    captureCameraBg();   // direkt ein entzerrtes Bild als Hintergrund anzeigen
+                } else if (data.type === 'camera_calib_cleared') {
+                    logMessage("SYSTEM", t('calib.cleared'), "#888");
+                } else if (data.type === 'edges_result') {
+                    _showEdgeResult(data);
+                } else if (data.type === 'update_log') {
+                    logMessage("LASER", data.msg, "#aaa");
+                } else if (data.type === 'update_error') {
+                    logMessage("ERROR", t('upd.error') + ' ' + (data.msg || ''), "red");
+                    alert(t('upd.error') + '\n\n' + (data.msg || ''));
+                } else if (data.type === 'update_done') {
+                    if (data.restart) {
+                        logMessage("SYSTEM", t('upd.restarting'), "#27ae60");
+                        let s = 10;
+                        let iv = setInterval(() => {
+                            s--;
+                            logMessage("SYSTEM", t('upd.reloadIn').replace('{n}', s), "#888");
+                            if (s <= 0) { clearInterval(iv); location.reload(); }
+                        }, 1000);
+                    } else {
+                        logMessage("SYSTEM", t('upd.manual'), "#e67e22");
+                        alert(t('upd.manual'));
+                    }
                 } else if (data.type === 'job_done') {
                     _jobRunning = false;
                     document.getElementById('progressBar').style.width = '100%';
