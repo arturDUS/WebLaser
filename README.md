@@ -31,6 +31,8 @@
 - **Materialbibliothek:** serverseitig gespeichert (`materials.json`), für alle Clients im Netzwerk
 - **Parameter-Test:** Gravur-/Schnitt-Matrix wie bei LightBurn, inkl. Bewertung & Material-Speicherung
 - **Maschine:** USB (COM) & WLAN (**FluidNC** & Grbl_ESP32, Firmware-Auto-Erkennung, Telnet/WebUI), Jog-Controller, Befehls-Historie (↑/↓), Pumpensteuerung (M8/M9 mit Nachlauf)
+- **Kamera:** Hintergrundbild (CSI/USB), Kalibrierung (entzerrt, Thin-Plate-Spline), Kantenerkennung → Vektor
+- **Raspberry Pi:** automatische MKS-DLC32-Verbindung, Software-Update per Web-UI-Button, **mobile Touch-Bedienseite + PWA** fürs Handy
 - **Projekt:** Speichern/Laden aller Objekte (inkl. Bilder & SVG) mit Datei-Dialog
 - **Mehrsprachig:** Deutsch, English, Español, 中文
 
@@ -123,6 +125,8 @@ MIT — siehe [Lizenz / License](#-lizenz--license) am Ende.
 - **Material library:** stored server-side (`materials.json`), shared across all clients on the network
 - **Parameter test:** engrave/cut matrix like LightBurn, incl. evaluation & material saving
 - **Machine:** USB (COM) & Wi-Fi (**FluidNC** & Grbl_ESP32, firmware auto-detection, Telnet/WebUI), jog controller, command history (↑/↓), pump control (M8/M9 with after-run)
+- **Camera:** background image (CSI/USB), calibration (rectified, thin-plate-spline), edge detection → vector
+- **Raspberry Pi:** automatic MKS DLC32 connection, software update via web-UI button, **mobile touch control page + PWA** for phones
 - **Project:** save/load all objects (incl. images & SVG) via a file dialog
 - **Multilingual:** Deutsch, English, Español, 中文
 

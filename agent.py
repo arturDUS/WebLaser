@@ -876,6 +876,57 @@ def serial_worker(loop):
         else:
             time.sleep(0.5)
 
+# --- AUTOMATISCHE USB-VERBINDUNG ZUM MKS DLC32 (nur Linux/Raspberry Pi) ---
+# USB-Seriell-Chips, die das MKS DLC32 ueblicherweise verwendet
+_MKS_USB_IDS = [(0x1A86, 0x7523),  # CH340
+                (0x1A86, 0x55D4),  # CH9102 (manche MKS-Boards)
+                (0x10C4, 0xEA60)]  # CP2102
+_auto_connect_tried = False        # nur einmal pro Prozess versuchen (nach Erfolg)
+
+def find_mks_port():
+    """Sucht einen seriellen Port, der zum MKS DLC32 passt (CH340/CH9102/CP2102).
+    Gibt das Geraet (z. B. /dev/ttyUSB0) mit der besten Uebereinstimmung zurueck oder None."""
+    candidates = []
+    for p in serial.tools.list_ports.comports():
+        vid, pid = getattr(p, "vid", None), getattr(p, "pid", None)
+        desc = ((p.description or "") + " " + (p.hwid or "")).upper()
+        score = 0
+        if vid is not None and pid is not None and (vid, pid) in _MKS_USB_IDS:
+            score = 2
+        elif any(s in desc for s in ("CH340", "CH9102", "CP210", "USB SERIAL", "USB-SERIAL")):
+            score = 1
+        if score:
+            candidates.append((score, p.device))
+    if not candidates:
+        return None
+    candidates.sort(reverse=True)   # hoechste Uebereinstimmung zuerst
+    return candidates[0][1]
+
+async def _maybe_autoconnect(websocket, loop):
+    """Auf Linux automatisch mit einem erkannten MKS-DLC32-Board (USB) verbinden,
+    sofern noch keine Verbindung besteht. Wird beim Verbinden eines Clients aufgerufen."""
+    global laser_serial, stop_thread, current_transport, firmware_detected, _auto_connect_tried
+    if _auto_connect_tried or not sys.platform.startswith("linux"):
+        return
+    if laser_serial is not None and getattr(laser_serial, "is_open", False):
+        return
+    port = find_mks_port()
+    if not port:
+        return
+    try:
+        firmware_detected = None
+        current_transport = "USB"
+        laser_serial = serial.Serial(port, 115200, timeout=0.1)
+        stop_thread = False
+        threading.Thread(target=serial_worker, args=(loop,), daemon=True).start()
+        _auto_connect_tried = True
+        await websocket.send(json.dumps({"type": "info", "msg": f"MKS DLC32 automatisch verbunden ({port})"}))
+        await websocket.send(json.dumps({"type": "conn_info", "transport": current_transport, "connType": "usb"}))
+        job_queue.append('$I')
+        print(f"DEBUG: Auto-Verbindung MKS DLC32 an {port}")
+    except Exception as e:
+        print(f"DEBUG: Auto-Verbindung fehlgeschlagen: {e}")
+
 # --- WEBSOCKET HANDLER ---
 async def handle_client(websocket, path=None):
     global laser_serial, connected_websocket, stop_thread, total_job_lines, completed_job_lines, last_progress_percent, bytes_in_buffer, unacked_lengths
@@ -883,7 +934,10 @@ async def handle_client(websocket, path=None):
     active_connections += 1
     connected_websocket = websocket
     loop = asyncio.get_event_loop()
-    
+
+    # Auf Linux/Raspberry Pi automatisch mit einem erkannten MKS-DLC32 (USB) verbinden
+    await _maybe_autoconnect(websocket, loop)
+
     try:
         async for message in websocket:
             data = json.loads(message)

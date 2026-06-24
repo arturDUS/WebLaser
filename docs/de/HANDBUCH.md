@@ -24,7 +24,8 @@
 15. [Prozessablauf (Standard-Workflow)](#15-prozessablauf-standard-workflow)
 16. [Technik: G-Code-Erzeugung](#16-technik-g-code-erzeugung)
 17. [Tastenkürzel](#17-tastenkürzel)
-18. [Fehlerbehebung](#18-fehlerbehebung)
+18. [Kamera, Mobil-Bedienung & Wartung](#18-kamera-mobil-bedienung--wartung)
+19. [Fehlerbehebung](#19-fehlerbehebung)
 
 ---
 
@@ -469,7 +470,51 @@ Der Job wird als „Mixed Job" an `agent.py` gesendet. Das Backend baut daraus e
 
 ---
 
-## 18. Fehlerbehebung
+## 18. Kamera, Mobil-Bedienung & Wartung
+
+Diese Funktionen sind vor allem für den Betrieb auf einem **Raspberry Pi** gedacht, der fest im Lasercutter verbaut ist.
+
+### 18.1 📷 Kamera-Hintergrundbild
+
+Eine Kamera über dem Arbeitsbereich liefert ein **halbtransparentes Hintergrundbild**, um Objekte passgenau auf ein bereits liegendes Werkstück zu legen. Die Bedienelemente liegen in der **oberen Leiste** des Arbeitsbereichs:
+
+- **Quelle:** **Pi-Kamera (CSI)** über `picamera2` oder **USB-Kamera** (UVC) über OpenCV.
+- **📷** nimmt ein Bild auf und legt es **gesperrt** hinter die Objekte (wird nie mitgelasert), **Transparenz**-Regler, **✕** entfernt es.
+
+### 18.2 ⌖ Kamera-Kalibrierung
+
+Damit das Kamerabild **maßgenau** auf dem Bett liegt (Perspektive **und** Weitwinkel-Verzeichnung), kalibrierst du einmalig über den **⌖-Button**:
+
+1. **Physische Marker** an die **8 Positionen** legen: 4 Ecken + 4 Kantenmitten.
+2. **Foto aufnehmen** und die Punkte in fester Reihenfolge anklicken (erst 4 Ecken, dann 4 Mitten – gelbe Fadenkreuze helfen).
+3. **Speichern** → das Backend entzerrt per **Thin-Plate-Spline** und wendet die Kalibrierung automatisch auf jedes weitere Bild an (gespeichert in `camera_calib.json`).
+
+### 18.3 ⚲ Kantenerkennung → Vektor
+
+Form auf ein Blatt zeichnen / Objekt auflegen, Button **⚲** (Werkzeuge-Panel, neben dem Box-Generator):
+
+1. **📷 Aufnehmen & erkennen** – das (ggf. entzerrte) Bild wird per **Canny + Konturensuche** analysiert, die Vorschau zeigt die Kanten grün.
+2. **Live-Regler** (Kanten-Schwellen, Glättung, Min.-Länge, Vereinfachung) anpassen.
+3. **Als Vektor übernehmen** → die Konturen werden als **bearbeitbare Schnitt-Objekte** in den Arbeitsbereich eingefügt. Am genauesten mit vorheriger Kalibrierung.
+
+### 18.4 Automatische Verbindung (Raspberry Pi)
+
+Läuft die App auf **Linux/Raspberry Pi** und ist ein **MKS DLC32** per USB angeschlossen, **verbindet sich die App automatisch** damit, sobald die Oberfläche geöffnet wird (Erkennung über die USB-Seriell-Kennung CH340/CH9102/CP2102). So kann das Display am Laser entfallen. Trennst du manuell, wird nicht automatisch wieder verbunden.
+
+### 18.5 ⟳ Software-Update über die Web-UI
+
+Der Button **„⟳ Software aktualisieren"** (Panel ⚙️ Maschine) holt die neueste Version per `git pull` und startet den Dienst neu — **ohne sich am Pi anzumelden**. Voraussetzung ist der systemd-Dienst mit `Restart=always` (im Installer enthalten); bestehende Installationen einmalig per Installer-Neulauf aktualisieren. Ist kein Auto-Neustart möglich, wird das Update geholt und ein manueller Neustart gemeldet (der Server bleibt also nie unten).
+
+### 18.6 📱 Mobile Bedienseite & PWA
+
+Unter **`http://<Pi-IP>:8080/mobile.html`** gibt es eine fingerfreundliche Touch-Oberfläche zum **Positionieren des Kopfes** (Jog-Pad mit Schrittweiten), **Home/Nullpunkt/Unlock**, **Pointer-Laser** und **Pumpe** schalten sowie **Live-Status** — ideal, um den Laser **vor Ort per Handy** ohne Display zu bedienen (Handy und Pi im selben WLAN).
+
+- **„Zum Startbildschirm hinzufügen"** (Android/iOS) öffnet die Seite als **App im Vollbild** (PWA-Manifest + Icon) — kein App-Store nötig.
+- Ein Link **„📱 Mobile Bedienseite"** findet sich auch im Maschinen-Panel der Hauptoberfläche.
+
+---
+
+## 19. Fehlerbehebung
 
 | Problem | Ursache / Lösung |
 |---|---|

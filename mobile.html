@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>WebLaser Steuerung</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#1a1a1a">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WebLaser">
+
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; background: #1a1a1a; color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none; -webkit-user-select: none; }
+        body { padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+        header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        header img { width: 28px; height: 28px; border-radius: 6px; }
+        header h1 { font-size: 17px; margin: 0; flex: 1; }
+        #connDot { width: 12px; height: 12px; border-radius: 50%; background: #c0392b; box-shadow: 0 0 6px #c0392b; }
+        #connDot.ok { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+
+        .card { background: #2a2a2a; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+        .status { display: flex; justify-content: space-between; align-items: center; }
+        .status .state { font-size: 20px; font-weight: bold; color: #f1c40f; }
+        .status .coord { font-family: monospace; font-size: 15px; color: #0ff; text-align: right; }
+        .status .coord b { color: #2ecc71; }
+
+        .jog { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .jog button { height: 64px; font-size: 22px; border: none; border-radius: 10px;
+            background: #3a3a3a; color: #fff; font-weight: bold; }
+        .jog button:active { background: #007acc; }
+        .jog .ctr { display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #222; font-size: 13px; color: #aaa; }
+        .jog .ctr b { font-size: 18px; color: #fff; }
+
+        .steps { display: flex; gap: 8px; margin-top: 10px; }
+        .steps button { flex: 1; height: 42px; border: none; border-radius: 8px; background: #3a3a3a; color: #ddd; font-size: 15px; }
+        .steps button.active { background: #007acc; color: #fff; font-weight: bold; }
+
+        .row { display: flex; gap: 8px; margin-bottom: 10px; }
+        .row button { flex: 1; height: 54px; border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: bold; }
+        .b-home { background: #2c3e50; } .b-zero { background: #8e44ad; } .b-unlock { background: #e67e22; }
+        .b-laser { background: #555; } .b-laser.on { background: #c0392b; }
+        .b-pump { background: #555; } .b-pump.on { background: #27ae60; }
+        .b-stop { background: #c0392b; height: 64px; font-size: 20px; width: 100%; border: none; border-radius: 12px; color: #fff; font-weight: bold; }
+        .b-stop:active { background: #e74c3c; }
+        .foot { text-align: center; margin-top: 14px; }
+        .foot a { color: #777; font-size: 13px; text-decoration: none; }
+        .hint { font-size: 11px; color: #777; margin: 2px 0 10px; }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="icon-192.png" alt="">
+        <h1>WebLaser</h1>
+        <div id="connDot" title="Verbindung"></div>
+    </header>
+
+    <div class="card status">
+        <div class="state" id="state">–</div>
+        <div class="coord">X <b id="px">0.00</b> &nbsp; Y <b id="py">0.00</b></div>
+    </div>
+
+    <div class="card">
+        <div class="jog">
+            <button onpointerdown="jog(-1,1)">↖</button>
+            <button onpointerdown="jog(0,1)">↑</button>
+            <button onpointerdown="jog(1,1)">↗</button>
+            <button onpointerdown="jog(-1,0)">←</button>
+            <div class="ctr">Schritt<b id="stepLbl">1</b>mm</div>
+            <button onpointerdown="jog(1,0)">→</button>
+            <button onpointerdown="jog(-1,-1)">↙</button>
+            <button onpointerdown="jog(0,-1)">↓</button>
+            <button onpointerdown="jog(1,-1)">↘</button>
+        </div>
+        <div class="steps" id="steps">
+            <button data-s="0.1">0.1</button>
+            <button data-s="1" class="active">1</button>
+            <button data-s="10">10</button>
+            <button data-s="50">50</button>
+        </div>
+        <div class="hint">Diagonalen bewegen X und Y gleichzeitig.</div>
+    </div>
+
+    <div class="row">
+        <button class="b-home" onpointerdown="send('$H')">🏠 Home</button>
+        <button class="b-zero" onpointerdown="send('G10 L20 P1 X0 Y0')">⌖ Nullpunkt</button>
+        <button class="b-unlock" onpointerdown="send('$X')">🔓 Unlock</button>
+    </div>
+    <div class="row">
+        <button id="btnLaser" class="b-laser" onpointerdown="toggleLaser()">🔦 Pointer EIN</button>
+        <button id="btnPump" class="b-pump" onpointerdown="togglePump()">💨 Pumpe EIN</button>
+    </div>
+
+    <button class="b-stop" onpointerdown="stopAll()">⏹ STOP</button>
+
+    <div class="foot"><a href="index.html">↗ Vollansicht (Zeichnen &amp; Lasern)</a></div>
+
+    <script>
+        let ws = null, _reconnect = null;
+        let step = 1, feed = 2000;
+        let laserOn = false, pumpOn = false;
+
+        function connect() {
+            let host = location.hostname || 'localhost';
+            ws = new WebSocket('ws://' + host + ':8765');
+            ws.onopen = () => {
+                if (_reconnect) { clearTimeout(_reconnect); _reconnect = null; }
+                setConn(true);
+            };
+            ws.onclose = () => {
+                setConn(false);
+                if (!_reconnect) _reconnect = setTimeout(() => { _reconnect = null; connect(); }, 2500);
+            };
+            ws.onerror = () => { try { ws.close(); } catch (e) {} };
+            ws.onmessage = (e) => {
+                let d; try { d = JSON.parse(e.data); } catch (_) { return; }
+                if (d.type === 'status') {
+                    document.getElementById('state').textContent = d.state || '–';
+                    if (typeof d.x === 'number') document.getElementById('px').textContent = d.x.toFixed(2);
+                    if (typeof d.y === 'number') document.getElementById('py').textContent = d.y.toFixed(2);
+                }
+            };
+        }
+        function setConn(ok) {
+            let el = document.getElementById('connDot');
+            el.classList.toggle('ok', ok);
+            if (!ok) document.getElementById('state').textContent = 'getrennt';
+        }
+        function send(cmd) {
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'send_gcode', command: cmd }));
+        }
+        function jog(sx, sy) {
+            if (!sx && !sy) return;
+            let cmd = '$J=G91 G21 F' + feed;
+            if (sx) cmd += ' X' + (sx * step).toFixed(3);
+            if (sy) cmd += ' Y' + (sy * step).toFixed(3);
+            send(cmd);
+            if (navigator.vibrate) navigator.vibrate(8);
+        }
+        function toggleLaser() {
+            laserOn = !laserOn;
+            let b = document.getElementById('btnLaser');
+            if (laserOn) {
+                // Laser-Modus kurz aus, damit der Laser im Stillstand feuert; minimale Leistung
+                send('$32=0'); send('M3 S1');
+                b.classList.add('on'); b.textContent = '🔦 Pointer AUS';
+            } else {
+                send('M5'); send('$32=1');
+                b.classList.remove('on'); b.textContent = '🔦 Pointer EIN';
+            }
+        }
+        function togglePump() {
+            pumpOn = !pumpOn;
+            let b = document.getElementById('btnPump');
+            send(pumpOn ? 'M8' : 'M9');
+            b.classList.toggle('on', pumpOn);
+            b.textContent = pumpOn ? '💨 Pumpe AUS' : '💨 Pumpe EIN';
+        }
+        function stopAll() {
+            laserOn = false;
+            let b = document.getElementById('btnLaser'); b.classList.remove('on'); b.textContent = '🔦 Pointer EIN';
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'abort_job' }));
+            send('M5'); send('$32=1');
+            if (navigator.vibrate) navigator.vibrate(40);
+        }
+
+        // Schrittweiten-Auswahl
+        document.getElementById('steps').addEventListener('click', (e) => {
+            let b = e.target.closest('button'); if (!b) return;
+            step = parseFloat(b.dataset.s);
+            document.getElementById('stepLbl').textContent = b.dataset.s;
+            document.querySelectorAll('#steps button').forEach(x => x.classList.toggle('active', x === b));
+        });
+        // Versehentliches Doppeltippen-Zoom / Kontextmenü unterdrücken
+        document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+        document.addEventListener('contextmenu', e => e.preventDefault());
+
+        connect();
+    </script>
+</body>
+</html>

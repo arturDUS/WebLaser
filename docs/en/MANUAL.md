@@ -24,7 +24,8 @@
 15. [Process Flow (Standard Workflow)](#15-process-flow-standard-workflow)
 16. [Technical: G-code Generation](#16-technical-g-code-generation)
 17. [Keyboard Shortcuts](#17-keyboard-shortcuts)
-18. [Troubleshooting](#18-troubleshooting)
+18. [Camera, Mobile Control & Maintenance](#18-camera-mobile-control--maintenance)
+19. [Troubleshooting](#19-troubleshooting)
 
 ---
 
@@ -469,7 +470,51 @@ The job is sent to `agent.py` as a "mixed job". The backend builds a G-code list
 
 ---
 
-## 18. Troubleshooting
+## 18. Camera, Mobile Control & Maintenance
+
+These features are aimed mainly at running on a **Raspberry Pi** built into the laser cutter.
+
+### 18.1 📷 Camera Background Image
+
+A camera above the work area provides a **semi-transparent background image** to place objects precisely onto a workpiece that is already in position. The controls are in the **top bar** of the workspace:
+
+- **Source:** **Pi camera (CSI)** via `picamera2` or **USB camera** (UVC) via OpenCV.
+- **📷** captures an image and places it **locked** behind the objects (never lasered), a **transparency** slider, **✕** removes it.
+
+### 18.2 ⌖ Camera Calibration
+
+So the camera image sits **dimensionally accurate** on the bed (perspective **and** wide-angle distortion), calibrate once via the **⌖ button**:
+
+1. Place **physical markers** at the **8 positions**: 4 corners + 4 edge midpoints.
+2. **Capture a photo** and click the points in a fixed order (4 corners first, then 4 midpoints – yellow crosshairs help).
+3. **Save** → the backend rectifies via **Thin-Plate-Spline** and applies the calibration automatically to every further image (stored in `camera_calib.json`).
+
+### 18.3 ⚲ Edge Detection → Vector
+
+Draw a shape on a sheet / place an object, then the **⚲ button** (Tools panel, next to the box generator):
+
+1. **📷 Capture & detect** – the (rectified) image is analysed via **Canny + contour finding**, the preview shows the edges in green.
+2. Adjust the **live sliders** (edge thresholds, smoothing, min. length, simplify).
+3. **Apply as vector** → the contours are inserted as **editable cut objects**. Most accurate with prior calibration.
+
+### 18.4 Automatic Connection (Raspberry Pi)
+
+When the app runs on **Linux/Raspberry Pi** and an **MKS DLC32** is connected via USB, the app **connects to it automatically** as soon as the UI is opened (detected via the USB-serial chip CH340/CH9102/CP2102). This lets you drop the display at the laser. If you disconnect manually, it won't auto-reconnect.
+
+### 18.5 ⟳ Software Update via the Web UI
+
+The **"⟳ Update software"** button (⚙️ Machine panel) fetches the latest version via `git pull` and restarts the service — **without logging into the Pi**. It requires the systemd service with `Restart=always` (included in the installer); update existing installs once by re-running the installer. If an auto-restart isn't possible, the update is fetched and a manual restart is reported (so the server is never left down).
+
+### 18.6 📱 Mobile Control Page & PWA
+
+At **`http://<Pi-IP>:8080/mobile.html`** there is a touch-friendly UI to **position the head** (jog pad with step sizes), trigger **Home/Origin/Unlock**, toggle the **pointer laser** and **pump**, and see the **live status** — ideal for operating the laser **on-site from a phone** without a display (phone and Pi on the same Wi-Fi).
+
+- **"Add to Home Screen"** (Android/iOS) opens the page as a **full-screen app** (PWA manifest + icon) — no app store needed.
+- A link **"📱 Mobile control page"** is also available in the machine panel of the main UI.
+
+---
+
+## 19. Troubleshooting
 
 | Problem | Cause / Solution |
 |---|---|
