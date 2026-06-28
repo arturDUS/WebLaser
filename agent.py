@@ -1083,6 +1083,18 @@ async def handle_client(websocket, path=None):
                     global current_transport, firmware_detected
                     firmware_detected = None   # bei jeder neuen Verbindung zurücksetzen
 
+                    # Bestehende Verbindung (z. B. Auto-Connect) zuerst sauber beenden,
+                    # damit nicht ZWEI serial_worker gleichzeitig vom Port lesen (-> Datensalat).
+                    if laser_serial is not None:
+                        stop_thread = True
+                        await asyncio.sleep(0.6)   # alten Worker sicher auslaufen lassen
+                        try:
+                            if getattr(laser_serial, "is_open", False):
+                                laser_serial.close()
+                        except Exception:
+                            pass
+                        laser_serial = None
+
                     if conn_type == "net":
                         ip = data.get("ip")
                         net_mode = data.get("netMode", "auto")        # auto | telnet | webui
