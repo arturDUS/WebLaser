@@ -16,6 +16,8 @@ dist/
 materials.json
 # Kamera-Kalibrierung (gerätespezifisch) / device-specific camera calibration
 camera_calib.json
+# Autofokus-Einstellungen (gerätespezifisch) / device-specific autofocus settings
+focus_settings.json
 # gespeicherte Projekte / saved projects
 laser_projekt.json
 *.gcode

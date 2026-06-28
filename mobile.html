@@ -98,15 +98,38 @@
         <button id="btnLaser" class="b-laser" onpointerdown="toggleLaser()">🔦 Pointer EIN</button>
         <button id="btnPump" class="b-pump" onpointerdown="togglePump()">💨 Pumpe EIN</button>
     </div>
+    <div class="row">
+        <button class="b-af" onpointerdown="runAutofocus()" style="flex:1; background:#16a085;">🎯 Autofokus</button>
+        <button onpointerdown="openAF()" style="flex:0 0 56px; background:#444;">⚙</button>
+    </div>
 
     <button class="b-stop" onpointerdown="stopAll()">⏹ STOP</button>
 
     <div class="foot"><a href="index.html">↗ Vollansicht (Zeichnen &amp; Lasern)</a></div>
 
+    <!-- Autofokus-Einstellungen -->
+    <div id="afModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center;">
+        <div style="background:#222; border:2px solid #16a085; border-radius:10px; padding:16px; width:88%; max-width:340px;">
+            <h2 style="margin:0 0 10px; font-size:16px; color:#3fc79f;">🎯 Autofokus-Einstellungen</h2>
+            <label style="font-size:12px; color:#aaa;">Antastweg max. (mm)</label>
+            <input type="number" id="afTravel" value="30" min="1" step="1" style="width:100%; padding:9px; margin:4px 0 10px; background:#333; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box; font-size:16px;">
+            <label style="font-size:12px; color:#aaa;">Antastgeschwindigkeit F (mm/min)</label>
+            <input type="number" id="afFeed" value="100" min="1" step="10" style="width:100%; padding:9px; margin:4px 0 10px; background:#333; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box; font-size:16px;">
+            <label style="font-size:12px; color:#aaa;">Fokus-Offset (mm, +hoch)</label>
+            <input type="number" id="afOffset" value="0" step="0.1" style="width:100%; padding:9px; margin:4px 0 4px; background:#333; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box; font-size:16px;">
+            <div style="font-size:11px; color:#888; margin:4px 0 12px;">Nach dem Antasten fährt der Kopf um den Offset in den Fokus.</div>
+            <div style="display:flex; gap:8px;">
+                <button onpointerdown="saveAF()" style="flex:1; height:46px; border:none; border-radius:8px; background:#27ae60; color:#fff; font-size:15px; font-weight:bold;">💾 Speichern</button>
+                <button onpointerdown="closeAF()" style="flex:1; height:46px; border:none; border-radius:8px; background:#555; color:#fff; font-size:15px;">Schließen</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let ws = null, _reconnect = null;
         let step = 1, feed = 2000;
         let laserOn = false, pumpOn = false;
+        let _focus = { travel: 30, feed: 100, offset: 0 };
 
         function connect() {
             let host = location.hostname || 'localhost';
@@ -126,6 +149,8 @@
                     document.getElementById('state').textContent = d.state || '–';
                     if (typeof d.x === 'number') document.getElementById('px').textContent = d.x.toFixed(2);
                     if (typeof d.y === 'number') document.getElementById('py').textContent = d.y.toFixed(2);
+                } else if (d.type === 'autofocus_settings') {
+                    _focus = { travel: d.travel, feed: d.feed, offset: d.offset };
                 }
             };
         }
@@ -170,6 +195,29 @@
             if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'abort_job' }));
             send('M5'); send('$32=1');
             if (navigator.vibrate) navigator.vibrate(40);
+        }
+        // Autofokus
+        function runAutofocus() {
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'run_autofocus' }));
+            if (navigator.vibrate) navigator.vibrate(8);
+        }
+        function openAF() {
+            document.getElementById('afTravel').value = _focus.travel;
+            document.getElementById('afFeed').value = _focus.feed;
+            document.getElementById('afOffset').value = _focus.offset;
+            document.getElementById('afModal').style.display = 'flex';
+        }
+        function closeAF() { document.getElementById('afModal').style.display = 'none'; }
+        function saveAF() {
+            let g = id => parseFloat(document.getElementById(id).value);
+            let travel = g('afTravel'), fd = g('afFeed'), off = g('afOffset');
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({
+                action: 'set_autofocus',
+                travel: isNaN(travel) ? 30 : travel,
+                feed: isNaN(fd) ? 100 : fd,
+                offset: isNaN(off) ? 0 : off
+            }));
+            closeAF();
         }
 
         // Schrittweiten-Auswahl

@@ -432,6 +432,10 @@
              <div class="row" style="margin-top: 5px;">
                 <button onclick="openJogModal()" data-i18n="ctrl.jog" style="background: #2404db; font-weight: bold; font-size: 13px;">🎯 Grafischer Jog-Controller</button>
             </div>
+            <div class="row" style="margin-top: 5px;">
+                <button onclick="runAutofocus()" data-i18n="af.btn" data-i18n-title="af.btnTip" title="Autofokus (Höhe antasten)" style="flex: 1; background: #16a085; font-weight: bold; font-size: 13px;">🎯 Autofokus</button>
+                <button onclick="openFocusDialog()" data-i18n-title="af.settingsTip" title="Autofokus-Einstellungen" style="width: 44px; background: #555;">⚙</button>
+            </div>
             <div id="log" style="margin-top: 10px; flex-grow: 1; min-height: 120px;"></div>
         </div>
     </div>
@@ -1176,6 +1180,22 @@
         <div style="display: flex; gap: 8px; margin-top: 14px; align-items: center;">
             <button id="edgeApply" onclick="applyEdges()" disabled style="margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="edge.apply">✅ Als Vektor übernehmen</button>
             <button onclick="closeEdgeDialog()" style="background: #555; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="common.close">Schließen</button>
+        </div>
+    </div>
+
+    <!-- AUTOFOKUS-EINSTELLUNGEN -->
+    <div id="focusDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; border: 2px solid #16a085; padding: 18px; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.6); z-index: 3200; width: 340px; max-width: 94vw; font-family: sans-serif; color: #fff;">
+        <h3 style="margin-top: 0; padding-bottom: 8px; border-bottom: 1px solid #444; font-size: 15px; color: #3fc79f;" data-i18n="af.title">🎯 Autofokus-Einstellungen</h3>
+        <label style="font-size: 12px; color: #aaa; display: block; margin-top: 10px;" data-i18n="af.travel">Antastweg max. (mm)</label>
+        <input type="number" id="afTravel" value="30" min="1" step="1" style="width: 100%; padding: 6px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; margin-top: 4px; box-sizing: border-box;">
+        <label style="font-size: 12px; color: #aaa; display: block; margin-top: 10px;" data-i18n="af.feed">Antastgeschwindigkeit F (mm/min)</label>
+        <input type="number" id="afFeed" value="100" min="1" step="10" style="width: 100%; padding: 6px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; margin-top: 4px; box-sizing: border-box;">
+        <label style="font-size: 12px; color: #aaa; display: block; margin-top: 10px;" data-i18n="af.offset">Fokus-Offset (mm, +hoch)</label>
+        <input type="number" id="afOffset" value="0" step="0.1" style="width: 100%; padding: 6px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; margin-top: 4px; box-sizing: border-box;">
+        <div style="font-size: 11px; color: #888; margin-top: 6px;" data-i18n="af.hint">Nach dem Antasten fährt der Kopf um den Offset nach oben in den Fokus. Einmalig kalibrieren.</div>
+        <div style="display: flex; gap: 8px; margin-top: 16px;">
+            <button onclick="saveFocus()" style="margin-left: auto; background: #27ae60; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="af.save">💾 Speichern</button>
+            <button onclick="closeFocusDialog()" style="background: #555; color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;" data-i18n="common.close">Schließen</button>
         </div>
     </div>
 
@@ -4392,6 +4412,11 @@
                 'upd.restarting':'Update erfolgreich – Server startet neu.', 'upd.reloadIn':'Seite wird in {n} s neu geladen…',
                 'upd.manual':'Update geholt. Bitte den WebLaser-Dienst/das Programm manuell neu starten.',
                 'mobile.link':'📱 Mobile Bedienseite (Handy)',
+                'af.btn':'🎯 Autofokus', 'af.btnTip':'Autofokus: Höhe per Microschalter antasten',
+                'af.settingsTip':'Autofokus-Einstellungen', 'af.title':'🎯 Autofokus-Einstellungen',
+                'af.travel':'Antastweg max. (mm)', 'af.feed':'Antastgeschwindigkeit F (mm/min)', 'af.offset':'Fokus-Offset (mm, +hoch)',
+                'af.hint':'Nach dem Antasten fährt der Kopf um den Offset nach oben in den Fokus. Einmalig kalibrieren.',
+                'af.save':'💾 Speichern', 'af.run':'Autofokus gestartet…',
                 'panel.objects':'📋 Objekte & Ebenen', 'obj.type':'Typ', 'obj.action':'Aktion',
                 'panel.layerParams':'⚙️ Ebenen-Parameter', 'mat.lib':'📚 Materialbibliothek', 'mat.libTip':'Materialbibliothek öffnen',
                 'layer.order':'Abarbeitungs-Reihenfolge:', 'layer.engraveFirst':'1. Gravieren, dann Schneiden (Empfohlen)',
@@ -4456,6 +4481,11 @@
                 'upd.restarting':'Update successful – server is restarting.', 'upd.reloadIn':'Reloading page in {n} s…',
                 'upd.manual':'Update fetched. Please restart the WebLaser service/program manually.',
                 'mobile.link':'📱 Mobile control page (phone)',
+                'af.btn':'🎯 Autofocus', 'af.btnTip':'Autofocus: probe height via microswitch',
+                'af.settingsTip':'Autofocus settings', 'af.title':'🎯 Autofocus settings',
+                'af.travel':'Max. probe travel (mm)', 'af.feed':'Probe feed F (mm/min)', 'af.offset':'Focus offset (mm, +up)',
+                'af.hint':'After probing, the head moves up by the offset into focus. Calibrate once.',
+                'af.save':'💾 Save', 'af.run':'Autofocus started…',
                 'panel.objects':'📋 Objects & Layers', 'obj.type':'Type', 'obj.action':'Action',
                 'panel.layerParams':'⚙️ Layer parameters', 'mat.lib':'📚 Material library', 'mat.libTip':'Open material library',
                 'layer.order':'Processing order:', 'layer.engraveFirst':'1. Engrave, then cut (recommended)',
@@ -4520,6 +4550,11 @@
                 'upd.restarting':'Actualización correcta: el servidor se reinicia.', 'upd.reloadIn':'Recargando la página en {n} s…',
                 'upd.manual':'Actualización obtenida. Reinicia el servicio/programa WebLaser manualmente.',
                 'mobile.link':'📱 Página de control móvil (teléfono)',
+                'af.btn':'🎯 Autofoco', 'af.btnTip':'Autofoco: palpar altura con microinterruptor',
+                'af.settingsTip':'Ajustes de autofoco', 'af.title':'🎯 Ajustes de autofoco',
+                'af.travel':'Recorrido de palpado máx. (mm)', 'af.feed':'Velocidad de palpado F (mm/min)', 'af.offset':'Offset de foco (mm, +arriba)',
+                'af.hint':'Tras palpar, el cabezal sube el offset hasta el foco. Calibrar una vez.',
+                'af.save':'💾 Guardar', 'af.run':'Autofoco iniciado…',
                 'panel.objects':'📋 Objetos y capas', 'obj.type':'Tipo', 'obj.action':'Acción',
                 'panel.layerParams':'⚙️ Parámetros de capa', 'mat.lib':'📚 Biblioteca de materiales', 'mat.libTip':'Abrir biblioteca de materiales',
                 'layer.order':'Orden de procesamiento:', 'layer.engraveFirst':'1. Grabar, luego cortar (recomendado)',
@@ -4584,6 +4619,11 @@
                 'upd.restarting':'更新成功 – 服务器正在重启。', 'upd.reloadIn':'{n} 秒后重新加载页面…',
                 'upd.manual':'已获取更新。请手动重启 WebLaser 服务/程序。',
                 'mobile.link':'📱 手机控制页面',
+                'af.btn':'🎯 自动对焦', 'af.btnTip':'自动对焦：用微动开关探测高度',
+                'af.settingsTip':'自动对焦设置', 'af.title':'🎯 自动对焦设置',
+                'af.travel':'最大探测行程 (mm)', 'af.feed':'探测速度 F (mm/min)', 'af.offset':'对焦偏移 (mm，+向上)',
+                'af.hint':'探测后，激光头按偏移上移到对焦位置。校准一次即可。',
+                'af.save':'💾 保存', 'af.run':'自动对焦已启动…',
                 'panel.objects':'📋 对象与图层', 'obj.type':'类型', 'obj.action':'操作',
                 'panel.layerParams':'⚙️ 图层参数', 'mat.lib':'📚 材料库', 'mat.libTip':'打开材料库',
                 'layer.order':'处理顺序：', 'layer.engraveFirst':'1. 先雕刻，后切割 (推荐)',
@@ -5211,6 +5251,32 @@
             if (!confirm(t('upd.confirm'))) return;
             logMessage("SYSTEM", t('upd.start'), "#34495e");
             ws.send(JSON.stringify({ action: "update_software" }));
+        }
+
+        // --- AUTOFOKUS (Höhe per Microschalter antasten) ---
+        let _focus = { travel: 30, feed: 100, offset: 0 };   // vom Server gemeldet/gespeichert
+
+        function runAutofocus() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) { alert("Keine Verbindung zum Agenten!"); return; }
+            logMessage("SYSTEM", t('af.run'), "#16a085");
+            ws.send(JSON.stringify({ action: "run_autofocus" }));
+        }
+        function openFocusDialog() {
+            document.getElementById('afTravel').value = _focus.travel;
+            document.getElementById('afFeed').value = _focus.feed;
+            document.getElementById('afOffset').value = _focus.offset;
+            document.getElementById('focusDialog').style.display = 'block';
+        }
+        function closeFocusDialog() { document.getElementById('focusDialog').style.display = 'none'; }
+        function saveFocus() {
+            let travel = parseFloat(document.getElementById('afTravel').value);
+            let feed = parseFloat(document.getElementById('afFeed').value);
+            let offset = parseFloat(document.getElementById('afOffset').value);
+            ws.send(JSON.stringify({ action: "set_autofocus",
+                travel: isNaN(travel) ? 30 : travel,
+                feed: isNaN(feed) ? 100 : feed,
+                offset: isNaN(offset) ? 0 : offset }));
+            closeFocusDialog();
         }
 
         function requestPorts() {
@@ -6187,6 +6253,8 @@
                 } else if (data.type === 'capabilities') {
                     _caps = data;
                     applyCapabilities();
+                } else if (data.type === 'autofocus_settings') {
+                    _focus = { travel: data.travel, feed: data.feed, offset: data.offset };
                 } else if (data.type === 'camera_photo') {
                     if (data.tag === 'calib') _showCalibPhoto(data.data);
                     else _placeCameraBg(data.data);

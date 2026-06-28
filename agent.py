@@ -51,6 +51,35 @@ def save_materials_file(mats):
         print(f"Material-Datei Schreibfehler: {e}")
         return False
 
+# Autofokus-Einstellungen (Maschineneigenschaft) serverseitig speichern → für alle Clients gleich.
+FOCUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "focus_settings.json")
+FOCUS_DEFAULTS = {"travel": 30.0, "feed": 100.0, "offset": 0.0}
+
+def load_focus():
+    """Liest die Autofokus-Einstellungen (Antastweg, Feed, Fokus-Offset)."""
+    d = dict(FOCUS_DEFAULTS)
+    try:
+        if os.path.exists(FOCUS_FILE):
+            with open(FOCUS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for k in FOCUS_DEFAULTS:
+                if k in data:
+                    d[k] = float(data[k])
+    except Exception as e:
+        print(f"Fokus-Datei Lesefehler: {e}")
+    return d
+
+def save_focus(d):
+    """Schreibt die Autofokus-Einstellungen."""
+    try:
+        clean = {k: float(d.get(k, FOCUS_DEFAULTS[k])) for k in FOCUS_DEFAULTS}
+        with open(FOCUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(clean, f, ensure_ascii=False, indent=2)
+        return clean
+    except Exception as e:
+        print(f"Fokus-Datei Schreibfehler: {e}")
+        return load_focus()
+
 # --- KAMERA (Raspberry Pi, CSI über picamera2/libcamera) ---
 _picam = None  # Picamera2-Instanz (einmal initialisiert, dann offen gehalten)
 
@@ -1066,6 +1095,8 @@ async def handle_client(websocket, path=None):
     # Verfuegbare Funktionen melden (OpenCV/Kamera/Update) → Frontend blendet UI passend ein/aus
     try:
         await websocket.send(json.dumps(_capabilities()))
+        # Autofokus-Einstellungen mitsenden (fuer die Dialoge in App + Mobil)
+        await websocket.send(json.dumps({"type": "autofocus_settings", **load_focus()}))
     except Exception:
         pass
 
@@ -1336,6 +1367,24 @@ async def handle_client(websocket, path=None):
                 print(f"DEBUG: Empfange G-Code: {cmd}") # <--- DAS HIER MUSS ERSCHEINEN
                 job_queue.append(cmd)
                 print(f"DEBUG: Aktuelle Job-Queue Länge: {len(job_queue)}")
+
+            elif action == "set_autofocus":
+                # Antastweg, Antastgeschwindigkeit und Fokus-Offset speichern (serverseitig)
+                f = save_focus(data)
+                await websocket.send(json.dumps({"type": "autofocus_settings", **f}))
+
+            elif action == "run_autofocus":
+                # Antasten nach unten, dann um den Fokus-Offset hochfahren
+                if not (laser_serial and getattr(laser_serial, "is_open", False)):
+                    await websocket.send(json.dumps({"type": "error", "msg": "Autofokus: keine Laser-Verbindung."}))
+                else:
+                    f = load_focus()
+                    job_queue.append(f"G38.2 Z-{f['travel']:.3f} F{f['feed']:.0f}")  # antasten
+                    job_queue.append("G91")                                            # relativ
+                    job_queue.append(f"G0 Z{f['offset']:.3f}")                         # auf Fokus
+                    job_queue.append("G90")                                            # absolut
+                    await websocket.send(json.dumps({"type": "info",
+                        "msg": f"Autofokus: antasten {f['travel']:.0f} mm @F{f['feed']:.0f}, Offset {f['offset']:.2f} mm"}))
 
             elif action == "get_materials":
                 # Materialbibliothek aus der Datei laden und an diesen Client senden
