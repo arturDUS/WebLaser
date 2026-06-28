@@ -282,6 +282,114 @@ def _will_restart_on_exit():
     except Exception:
         return False
 
+def _capabilities():
+    """Meldet dem Frontend, welche optionalen Funktionen verfuegbar sind – abhaengig
+    davon, ob OpenCV/picamera2 installiert sind und ob es eine git-Quellcode-Installation
+    ist. So werden nur tatsaechlich nicht nutzbare Features ausgeblendet (nicht pauschal
+    nach Betriebssystem)."""
+    import importlib.util
+    has = lambda m: importlib.util.find_spec(m) is not None
+    opencv = has("cv2")          # USB-Kamera, Kalibrierung, Kantenerkennung
+    picam = has("picamera2")     # CSI-Kamera (nur Raspberry Pi)
+    frozen = bool(getattr(sys, "frozen", False))
+    git_repo = (not frozen) and os.path.isdir(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), ".git"))
+    return {"type": "capabilities",
+            "opencv": opencv, "picamera2": picam, "camera": (opencv or picam),
+            "update": bool(git_repo), "platform": sys.platform, "frozen": frozen}
+
+def _get_lan_ip():
+    """Primaere LAN-IP ermitteln (ohne Daten zu senden)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+def oled_worker():
+    """Optionales 128x64-OLED (SSD1306 ueber I2C): zeigt einen QR-Code zur Mobilseite,
+    die Browser-Adresse (Hostname/IP) und den Maschinenstatus. Wechselt automatisch alle
+    OLED_CYCLE_SEC bzw. sofort per Taster. Ohne Hardware/Bibliotheken endet der Thread still."""
+    try:
+        from luma.core.interface.serial import i2c
+        from luma.oled.device import ssd1306
+        from PIL import Image, ImageDraw, ImageFont
+        import qrcode
+    except Exception as e:
+        print(f"DEBUG: OLED inaktiv (Bibliotheken fehlen: {e})")
+        return
+    try:
+        device = ssd1306(i2c(port=1, address=OLED_I2C_ADDR), width=128, height=64)
+    except Exception as e:
+        print(f"DEBUG: OLED-Display nicht gefunden: {e}")
+        return
+
+    advance = threading.Event()          # Taster oder Timeout -> naechste Anzeige
+    if OLED_BUTTON_GPIO is not None:
+        try:
+            from gpiozero import Button
+            _btn = Button(OLED_BUTTON_GPIO, pull_up=True, bounce_time=0.05)
+            _btn.when_pressed = advance.set
+        except Exception as e:
+            print(f"DEBUG: OLED-Taster nicht aktiv: {e}")
+
+    font = ImageFont.load_default()
+    # Verfuegbare Kamera-Backends einmalig ermitteln
+    import importlib.util as _ilu
+    _has = lambda m: _ilu.find_spec(m) is not None
+    cam_str = ("CSI+USB" if _has("cv2") and _has("picamera2")
+               else "USB" if _has("cv2") else "CSI" if _has("picamera2") else "-")
+    last_ip = None
+    qr_img = None
+    screen = 0
+    SCREENS = 3
+    print("DEBUG: OLED-Anzeige aktiv.")
+    while True:
+        host = socket.gethostname()
+        ip = _get_lan_ip()
+        if ip != last_ip:               # QR nur bei IP-Aenderung neu erzeugen
+            last_ip = ip
+            try:
+                qr = qrcode.QRCode(border=1, box_size=2)
+                qr.add_data(f"http://{ip}:{HTTP_PORT_OLED}/mobile.html")
+                qr.make(fit=True)
+                qr_img = qr.make_image(fill_color="white", back_color="black").convert("1").resize((64, 64))
+            except Exception:
+                qr_img = None
+        img = Image.new("1", (device.width, device.height))
+        d = ImageDraw.Draw(img)
+        if screen == 0:                 # QR-Code zur Mobilseite
+            if qr_img is not None:
+                img.paste(qr_img, (0, 0))
+            d.text((70, 6), "Handy:", font=font, fill=255)
+            d.text((70, 22), "QR-Code", font=font, fill=255)
+            d.text((70, 34), "scannen", font=font, fill=255)
+            d.text((70, 52), "Mobil-UI", font=font, fill=255)
+        elif screen == 1:               # Browser-Adresse fuer die volle UI
+            d.text((0, 0), "WebLaser im Browser:", font=font, fill=255)
+            d.text((0, 20), f"{host}.local:{HTTP_PORT_OLED}", font=font, fill=255)
+            d.text((0, 40), "oder:", font=font, fill=255)
+            d.text((0, 52), f"{ip}:{HTTP_PORT_OLED}", font=font, fill=255)
+        else:                           # System-Status
+            conn = (laser_serial is not None and getattr(laser_serial, "is_open", False))
+            fw = (firmware_detected or "-")
+            d.text((0, 0),  ("MKS: verbunden" if conn else "MKS: getrennt"), font=font, fill=255)
+            d.text((0, 11), f"Via: {current_transport}", font=font, fill=255)
+            d.text((0, 22), f"FW: {fw[:16]}", font=font, fill=255)
+            d.text((0, 33), f"Zust: {(last_state or '-')[:13]}", font=font, fill=255)
+            d.text((0, 44), f"X{last_mpos_x:6.1f} Y{last_mpos_y:6.1f}", font=font, fill=255)
+            d.text((0, 55), f"S:{int(last_s)}  Cam:{cam_str}", font=font, fill=255)
+        try:
+            device.display(img)
+        except Exception:
+            pass
+        if advance.wait(timeout=OLED_CYCLE_SEC):
+            advance.clear()
+        screen = (screen + 1) % SCREENS
+
 # --- GLOBALE VARIABLEN ---
 laser_serial = None
 connected_websocket = None
@@ -295,6 +403,16 @@ last_progress_percent = -1
 active_connections = 0
 current_transport = "USB"      # "USB" | "Telnet" | "ESP3D-WebUI" – aktive Verbindungsart
 firmware_detected = None       # z. B. "FluidNC v3.7" / "Grbl 1.1f" (per $I/Banner erkannt)
+last_state = ""                # zuletzt gemeldeter Maschinenzustand (fuer OLED)
+last_mpos_x = 0.0              # zuletzt gemeldete Maschinen-Position X (fuer OLED)
+last_mpos_y = 0.0              # zuletzt gemeldete Maschinen-Position Y (fuer OLED)
+last_s = 0.0                  # zuletzt gemeldete Laserleistung (S-Wert, fuer OLED)
+
+# --- OLED-Display (optional, Raspberry Pi, I2C SSD1306 128x64) ---
+OLED_I2C_ADDR    = 0x3C        # I2C-Adresse des Displays (meist 0x3C)
+OLED_BUTTON_GPIO = 17          # optionaler Taster (BCM-Pin, gegen GND); None = kein Taster
+OLED_CYCLE_SEC   = 8           # Sekunden bis zum automatischen Anzeigewechsel
+HTTP_PORT_OLED   = 8080        # Port, der auf dem Display angezeigt wird
 
 class NetworkLaser:
     """
@@ -774,6 +892,7 @@ def generate_gcode_from_svg(svg_string, feedrate, power, canvas_height, origin_x
 # --- SERIAL WORKER ---
 def serial_worker(loop):
     global laser_serial, connected_websocket, stop_thread, bytes_in_buffer, total_job_lines, completed_job_lines, last_progress_percent
+    global last_state, last_mpos_x, last_mpos_y, last_s
 
     print("DEBUG: Serial Worker gestartet.")
     last_poll_time = time.time()
@@ -797,7 +916,8 @@ def serial_worker(loop):
                         # Status-Polls (<...>)
                         if line_str.startswith('<'):
                             match = STATUS_RE.search(line_str)
-                            if match and connected_websocket:
+                            if match:
+                                # Laserleistung (S) parsen
                                 s_val = 0.0
                                 if "|FS:" in line_str:
                                     try:
@@ -808,15 +928,23 @@ def serial_worker(loop):
                                     try:
                                         s_val = float(line_str.split("|S:")[1].split(">")[0].split("|")[0])
                                     except: pass
-
-                                asyncio.run_coroutine_threadsafe(
-                                    connected_websocket.send(json.dumps({
-                                        "type": "status", 
-                                        "state": match.group(1), 
-                                        "x": float(match.group(2)), 
-                                        "y": float(match.group(3)),
-                                        "s": s_val
-                                    })), loop)
+                                # Globalen Status fuers OLED merken (auch ohne Browser)
+                                try:
+                                    last_state = match.group(1)
+                                    last_mpos_x = float(match.group(2))
+                                    last_mpos_y = float(match.group(3))
+                                    last_s = s_val
+                                except Exception:
+                                    pass
+                                if connected_websocket:
+                                    asyncio.run_coroutine_threadsafe(
+                                        connected_websocket.send(json.dumps({
+                                            "type": "status",
+                                            "state": match.group(1),
+                                            "x": float(match.group(2)),
+                                            "y": float(match.group(3)),
+                                            "s": s_val
+                                        })), loop)
                         # OK / Fehler-Meldungen
                         elif line_str.startswith('ok'):
                             net_waiting_ok = False          # Nächsten Befehl freigeben
@@ -934,6 +1062,12 @@ async def handle_client(websocket, path=None):
     active_connections += 1
     connected_websocket = websocket
     loop = asyncio.get_event_loop()
+
+    # Verfuegbare Funktionen melden (OpenCV/Kamera/Update) → Frontend blendet UI passend ein/aus
+    try:
+        await websocket.send(json.dumps(_capabilities()))
+    except Exception:
+        pass
 
     # Auf Linux/Raspberry Pi automatisch mit einem erkannten MKS-DLC32 (USB) verbinden
     await _maybe_autoconnect(websocket, loop)
@@ -1218,9 +1352,9 @@ async def shutdown_timer():
     await asyncio.sleep(2) 
     
     global active_connections
-    if active_connections == 0:
-        # os._exit(0) ist ein "harter" Befehl. Er killt sofort den Webserver, 
-        # den WebSocket und beendet die .exe restlos, ohne auf Threads zu warten.
+    # Nur die Desktop-EXE beendet sich beim Schließen des letzten Browsers.
+    # Auf dem Pi/Server (Quellcode) bleibt der Agent laufen (OLED, Auto-Connect, bereit).
+    if active_connections == 0 and getattr(sys, "frozen", False):
         os._exit(0)
 
 async def main():
@@ -1229,7 +1363,11 @@ async def main():
 
     # 2. NEU: Das Frontend vollautomatisch als "Desktop-App" öffnen
     threading.Thread(target=open_browser_app_mode, daemon=True).start()
-    
+
+    # 2b. Optionales OLED-Display (nur Linux/Raspberry Pi; ohne Hardware still beendet)
+    if sys.platform.startswith("linux"):
+        threading.Thread(target=oled_worker, daemon=True).start()
+
     # 3. Den WebSocket Server für die Laser-Befehle starten
     print("Starte WebSocket Server auf Port 8765...")
     async with websockets.serve(handle_client, "0.0.0.0", 8765):

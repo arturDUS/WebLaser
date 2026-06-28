@@ -512,6 +512,23 @@ Unter **`http://<Pi-IP>:8080/mobile.html`** gibt es eine fingerfreundliche Touch
 - **„Zum Startbildschirm hinzufügen"** (Android/iOS) öffnet die Seite als **App im Vollbild** (PWA-Manifest + Icon) — kein App-Store nötig.
 - Ein Link **„📱 Mobile Bedienseite"** findet sich auch im Maschinen-Panel der Hauptoberfläche.
 
+### 18.7 🖥️ OLED-Statusdisplay (optional)
+
+Ein kleines **128×64-OLED (SSD1306, I2C)** am Pi zeigt – ganz ohne PC – die wichtigsten Infos und wechselt automatisch (alle 8 s) bzw. per optionalem **Taster** durch drei Anzeigen:
+
+1. **QR-Code** → öffnet die **Mobil-Bedienseite** (`…:8080/mobile.html`).
+2. **Browser-Adresse** der vollen UI: `hostname.local:8080` und `IP:8080`.
+3. **System-Status:** Pi↔MKS-Verbindung, Transport, Firmware, Zustand, Position (X/Y), Laserleistung (S) und verfügbare Kamera-Features.
+
+**Anschluss (Standard, in `agent.py` änderbar):**
+- OLED: `VCC→3.3V`, `GND→GND`, **`SDA→GPIO2 (Pin 3)`**, **`SCL→GPIO3 (Pin 5)`**, I2C-Adresse **0x3C**.
+- Optionaler Taster: **`GPIO17 (Pin 11)`** gegen GND (interner Pull-up).
+- Bibliotheken (`luma.oled`, `qrcode`) und I2C-Aktivierung erledigt der Installer. Für ein **1,3″-SH1106** in `oled_worker` `ssd1306` → `sh1106` ändern.
+
+### 18.8 Verfügbarkeit der Funktionen
+
+Die Kamera-Funktionen (Hintergrundbild, Kalibrierung, Kantenerkennung) hängen von **OpenCV** ab und sind **nicht an das Betriebssystem gebunden**: Sie laufen auch unter **Windows**, sofern OpenCV installiert ist (`pip install opencv-python`, Start aus dem Quellcode). Das Backend meldet der Oberfläche, was verfügbar ist, und **blendet nicht nutzbare Schaltflächen automatisch aus** (z. B. in der schlanken Windows-`agent.exe`, die OpenCV/picamera2 nicht enthält). Die **CSI-Kamera** benötigt zusätzlich `picamera2` (nur Raspberry Pi).
+
 ---
 
 ## 19. Fehlerbehebung

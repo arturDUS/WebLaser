@@ -78,6 +78,16 @@ rm -rf ~/WebLaser
 - **USB-Laser:** Nach der Erstinstallation einmal **neu booten**, damit die `dialout`-Gruppenrechte greifen.
 - **FluidNC per WLAN:** In der Oberfläche unter ⚙️ Maschine → WLAN → IP des FluidNC eingeben → Modus „Auto-Erkennung".
 - **Materialbibliothek:** Wird auf dem Pi in `~/WebLaser/materials.json` gespeichert und ist so für **alle** Nutzer im Netzwerk gemeinsam verfügbar.
+- **MKS DLC32 per USB:** Wird automatisch erkannt und verbunden, sobald die Oberfläche geöffnet wird (kein manuelles Verbinden nötig).
+- **Software-Update:** über den Button **„⟳ Software aktualisieren"** (Panel ⚙️ Maschine) — kein SSH/Login am Pi nötig.
+
+### 🖥️ Optionales OLED-Display (128×64, SSD1306, I2C)
+
+Ein kleines OLED zeigt direkt am Pi einen **QR-Code zur Mobilseite**, die **Browser-Adresse** (Hostname/IP) und den **System-Status** (Verbindung, Position, Leistung, Kamera). Der Installer installiert die Bibliotheken (`luma.oled`, `qrcode`) und aktiviert I2C.
+
+- **Anschluss:** `VCC→3.3V`, `GND→GND`, `SDA→GPIO2 (Pin 3)`, `SCL→GPIO3 (Pin 5)` — I2C-Adresse **0x3C**.
+- **Optionaler Taster** zum Weiterschalten: `GPIO17 (Pin 11)` gegen GND.
+- Nach dem Anschließen einmal **neu booten**. Einstellungen (Adresse, Taster-Pin, Wechselzeit) stehen in `agent.py`; für ein **1,3″-SH1106** dort `ssd1306` → `sh1106` ändern.
 
 ---
 
@@ -155,3 +165,13 @@ rm -rf ~/WebLaser
 - **USB laser:** after the first install, **reboot once** so the `dialout` group permissions take effect.
 - **FluidNC via Wi-Fi:** in the UI under ⚙️ Machine → Wi-Fi → enter the FluidNC IP → mode "Auto-detect".
 - **Material library:** stored on the Pi in `~/WebLaser/materials.json`, so it is shared by **all** users on the network.
+- **MKS DLC32 via USB:** detected and connected automatically as soon as the UI is opened (no manual connect needed).
+- **Software update:** via the **"⟳ Update software"** button (⚙️ Machine panel) — no SSH/login to the Pi required.
+
+### 🖥️ Optional OLED display (128×64, SSD1306, I2C)
+
+A small OLED shows, right at the Pi, a **QR code to the mobile page**, the **browser address** (hostname/IP) and the **system status** (connection, position, power, camera). The installer installs the libraries (`luma.oled`, `qrcode`) and enables I2C.
+
+- **Wiring:** `VCC→3.3V`, `GND→GND`, `SDA→GPIO2 (pin 3)`, `SCL→GPIO3 (pin 5)` — I2C address **0x3C**.
+- **Optional button** to cycle screens: `GPIO17 (pin 11)` to GND.
+- After connecting, **reboot once**. Settings (address, button pin, cycle time) are in `agent.py`; for a **1.3″ SH1106** change `ssd1306` → `sh1106` in `oled_worker`.

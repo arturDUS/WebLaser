@@ -363,7 +363,7 @@
                 <button id="btnLoadData" onclick="loadMachineData()" data-i18n="machine.data" data-i18n-title="machine.dataTip" title="Lese Daten ($$)" style="flex: 1; padding: 8px 2px; font-size: 12px; background: #27ae60; opacity: 0.3;" disabled>📡 Daten</button>
             </div>
 
-            <button onclick="updateSoftware()" data-i18n-title="upd.tip" title="Software vom GitHub aktualisieren (Server startet neu)"
+            <button id="updateBtn" onclick="updateSoftware()" data-i18n-title="upd.tip" title="Software vom GitHub aktualisieren (Server startet neu)"
                     style="margin-top: 10px; width: 100%; padding: 7px; background: #34495e; color: #fff; border: 1px solid #4a627a; border-radius: 4px; cursor: pointer; font-size: 12px;" data-i18n="upd.btn">⟳ Software aktualisieren</button>
 
             <a href="mobile.html" target="_blank" style="display: block; text-align: center; margin-top: 8px; color: #888; font-size: 12px; text-decoration: none;" data-i18n="mobile.link">📱 Mobile Bedienseite (Handy)</a>
@@ -464,17 +464,19 @@
                 <div style="border-left: 1px solid #555; margin: 0 5px;"></div>
                 <button onclick="activateMoveMode()" data-i18n-title="ws.moveLaser" title="Laser hierhin fahren" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #e74c3c;">🎯</button>
                 <button onclick="activateOriginMode()" data-i18n-title="ws.setOrigin" title="Nullpunkt hier setzen" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #9b59b6;">📍</button>
+                <!-- Kamera-Hintergrundbild (CSI / USB) – Sichtbarkeit je nach Capabilities -->
+                <span id="camGroup" style="display: contents;">
                 <div style="border-left: 1px solid #555; margin: 0 5px;"></div>
-                <!-- Kamera-Hintergrundbild (CSI / USB) -->
                 <select id="camSource" onchange="localStorage.setItem('camSource', this.value)" data-i18n-title="cam.source" title="Kameraquelle"
                         style="width: auto; margin: 0; padding: 4px 4px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
                     <option value="csi" data-i18n="cam.srcCsi">Pi-Kamera (CSI)</option>
                     <option value="usb" data-i18n="cam.srcUsb">USB-Kamera</option>
                 </select>
                 <button onclick="captureCameraBg()" data-i18n-title="cam.captureTip" title="Kamerabild aufnehmen" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #8e44ad;">📷</button>
-                <button onclick="openCamCalib()" data-i18n-title="calib.btnTip" title="Kamera kalibrieren" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #2c3e50;">⌖</button>
+                <button id="camCalibBtn" onclick="openCamCalib()" data-i18n-title="calib.btnTip" title="Kamera kalibrieren" class="icon-btn" style="width: 32px; height: 32px; font-size: 16px; background: #2c3e50;">⌖</button>
                 <button id="camRemoveBtn" onclick="removeCameraBg()" data-i18n-title="cam.removeTip" title="Kamerabild entfernen" class="icon-btn" disabled style="width: 32px; height: 32px; font-size: 14px; background: #555;">✕</button>
                 <input type="range" id="camOpacity" min="10" max="90" value="45" oninput="setCameraBgOpacity(this.value)" data-i18n-title="cam.opacity" title="Transparenz" style="display: none; width: 70px; margin: 0;">
+                </span>
             </div>
         </div>
 
@@ -549,7 +551,7 @@
             <div style="font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 3px 2px;" data-i18n="tools.genGroup">Generatoren / Gruppieren</div>
             <div class="tool-row" style="margin-bottom: 8px;">
                 <button class="icon-btn" onclick="openBoxDialog()" data-i18n-title="tools.box" title="Box-Generator (Finger-Joint)">▣</button>
-                <button class="icon-btn" onclick="openEdgeDialog()" data-i18n-title="edge.btnTip" title="Kantenerkennung → Vektor">⚲</button>
+                <button class="icon-btn" id="edgeBtn" onclick="openEdgeDialog()" data-i18n-title="edge.btnTip" title="Kantenerkennung → Vektor">⚲</button>
                 <button class="icon-btn" onclick="openArrayDialog()" data-i18n-title="tools.array" title="Raster-Kopie (Array)">▦</button>
                 <div style="border-left: 1px solid #555; margin: 0 4px;"></div>
                 <button class="icon-btn mono" onclick="groupSelection()" data-i18n-title="tools.group" title="Auswahl gruppieren">⛓</button>
@@ -4926,6 +4928,33 @@
        
         // --- KAMERA-HINTERGRUNDBILD (Raspberry-Pi-Kamera über dem Arbeitsbereich) ---
         let _cameraBg = null;   // fabric.Image des aktuellen Kamerabilds oder null
+        let _caps = null;       // vom Backend gemeldete Funktionen (OpenCV/Kamera/Update)
+
+        // Blendet OS-/installationsabhängige Funktionen ein/aus (OpenCV, Kamera, Update)
+        function applyCapabilities() {
+            let c = _caps || {};
+            let setDisp = (id, show, dispShown) => {
+                let el = document.getElementById(id);
+                if (el) el.style.display = show ? (dispShown || '') : 'none';
+            };
+            // Kamera-Gruppe (oben) nur, wenn überhaupt eine Kamera möglich ist
+            setDisp('camGroup', !!c.camera, 'contents');
+            // Quellen-Optionen je nach Backend
+            let optCsi = document.querySelector('#camSource option[value="csi"]');
+            let optUsb = document.querySelector('#camSource option[value="usb"]');
+            if (optCsi) { optCsi.hidden = !c.picamera2; optCsi.disabled = !c.picamera2; }
+            if (optUsb) { optUsb.hidden = !c.opencv;   optUsb.disabled = !c.opencv; }
+            let sel = document.getElementById('camSource');
+            if (sel) {
+                if (sel.value === 'csi' && !c.picamera2 && c.opencv) sel.value = 'usb';
+                if (sel.value === 'usb' && !c.opencv && c.picamera2) sel.value = 'csi';
+            }
+            // Kalibrierung (⌖) und Kantenerkennung (⚲) brauchen OpenCV
+            setDisp('camCalibBtn', !!c.opencv);
+            setDisp('edgeBtn', !!c.opencv);
+            // Web-UI-Update nur bei git-Quellcode-Installation (nicht in der EXE)
+            setDisp('updateBtn', !!c.update);
+        }
 
         function captureCameraBg() {
             if (!ws || ws.readyState !== WebSocket.OPEN) { alert("Keine Verbindung zum Agenten!"); return; }
@@ -6155,6 +6184,9 @@
                     logMessage("SYSTEM", txt, "#28a745");
                     let icon = document.getElementById('machineStatusIcon');
                     if (icon) icon.title = txt;
+                } else if (data.type === 'capabilities') {
+                    _caps = data;
+                    applyCapabilities();
                 } else if (data.type === 'camera_photo') {
                     if (data.tag === 'calib') _showCalibPhoto(data.data);
                     else _placeCameraBg(data.data);

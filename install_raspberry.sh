@@ -53,9 +53,13 @@ echo "==> [3/6] Python-Umgebung (venv) einrichten ..."
 python3 -m venv --system-site-packages "${INSTALL_DIR}/.venv"
 "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip
 "${INSTALL_DIR}/.venv/bin/pip" install pyserial websockets websocket-client svgelements
+# Optionales 128x64-OLED (I2C): QR-Code & IP-Anzeige
+"${INSTALL_DIR}/.venv/bin/pip" install luma.oled qrcode || echo "Hinweis: OLED-Bibliotheken nicht installiert (Display optional)."
 
-echo "==> [4/6] Zugriff auf USB-Seriell (Gruppe 'dialout') gewähren ..."
-sudo usermod -aG dialout "${RUN_USER}" || true
+echo "==> [4/6] Zugriff auf USB-Seriell + I2C/GPIO (fuer OLED/Taster) gewähren ..."
+sudo usermod -aG dialout,i2c,gpio,spi "${RUN_USER}" || true
+# I2C aktivieren (fuer das OLED-Display), falls raspi-config vorhanden ist
+command -v raspi-config >/dev/null 2>&1 && sudo raspi-config nonint do_i2c 0 || true
 
 echo "==> [5/6] systemd-Dienst einrichten ..."
 sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<EOF

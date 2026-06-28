@@ -512,6 +512,23 @@ At **`http://<Pi-IP>:8080/mobile.html`** there is a touch-friendly UI to **posit
 - **"Add to Home Screen"** (Android/iOS) opens the page as a **full-screen app** (PWA manifest + icon) — no app store needed.
 - A link **"📱 Mobile control page"** is also available in the machine panel of the main UI.
 
+### 18.7 🖥️ OLED Status Display (optional)
+
+A small **128×64 OLED (SSD1306, I2C)** on the Pi shows the key info without a PC and cycles automatically (every 8 s) or via an optional **button** through three screens:
+
+1. **QR code** → opens the **mobile control page** (`…:8080/mobile.html`).
+2. **Browser address** of the full UI: `hostname.local:8080` and `IP:8080`.
+3. **System status:** Pi↔MKS connection, transport, firmware, state, position (X/Y), laser power (S) and available camera features.
+
+**Wiring (defaults, changeable in `agent.py`):**
+- OLED: `VCC→3.3V`, `GND→GND`, **`SDA→GPIO2 (pin 3)`**, **`SCL→GPIO3 (pin 5)`**, I2C address **0x3C**.
+- Optional button: **`GPIO17 (pin 11)`** to GND (internal pull-up).
+- The installer handles the libraries (`luma.oled`, `qrcode`) and enabling I2C. For a **1.3″ SH1106**, change `ssd1306` → `sh1106` in `oled_worker`.
+
+### 18.8 Feature Availability
+
+The camera features (background image, calibration, edge detection) depend on **OpenCV** and are **not tied to the operating system**: they also run on **Windows** if OpenCV is installed (`pip install opencv-python`, run from source). The backend reports to the UI what is available and **automatically hides unsupported buttons** (e.g. in the slim Windows `agent.exe`, which doesn't include OpenCV/picamera2). The **CSI camera** additionally requires `picamera2` (Raspberry Pi only).
+
 ---
 
 ## 19. Troubleshooting
