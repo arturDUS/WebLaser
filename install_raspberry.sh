@@ -41,6 +41,9 @@ sudo apt-get install -y python3-picamera2 || echo "Hinweis: python3-picamera2 ni
 sudo apt-get install -y python3-opencv    || echo "Hinweis: python3-opencv nicht installiert (USB-Kamera optional)."
 # Schriftart fuer das OLED (grosse Koordinaten-Anzeige)
 sudo apt-get install -y fonts-dejavu-core || echo "Hinweis: fonts-dejavu-core nicht installiert (OLED nutzt sonst Standard-Font)."
+# OLED-Taster (gpiozero + lgpio-Backend) und I2C-Diagnose (i2cdetect).
+# gpiozero ist auf Pi OS Lite nicht vorinstalliert -> per apt, in venv via --system-site-packages sichtbar.
+sudo apt-get install -y python3-gpiozero python3-lgpio i2c-tools || echo "Hinweis: gpiozero/i2c-tools nicht installiert (OLED-Taster/Diagnose optional)."
 
 echo "==> [2/6] WebLaser von GitHub holen/aktualisieren ..."
 if [ -d "${INSTALL_DIR}/.git" ]; then
