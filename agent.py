@@ -419,7 +419,10 @@ def oled_worker():
             except Exception:
                 qr_img = None
 
-        laser_on = (last_s > 0)
+        # FluidNC meldet S (Leistung) auch nach dem Abschalten als "programmierten" Wert weiter.
+        # Daher gilt der Laser nur als feuernd, wenn der Zustand "Run" ist (wie im Frontend).
+        laser_on = (last_s > 0 and last_state == "Run")
+        eff_s = last_s if laser_on else 0.0
         img = Image.new("1", (device.width, device.height))
         d = ImageDraw.Draw(img)
 
@@ -443,7 +446,7 @@ def oled_worker():
             d.text((0, 28), "Y", font=font_med, fill=255)
             d.text((16, 26), f"{last_mpos_y:7.1f}", font=font_big, fill=255)
             d.text((0, 53), "Laser", font=font, fill=255)
-            pct = max(0.0, min(1.0, last_s / max(1.0, laser_max_power)))
+            pct = max(0.0, min(1.0, eff_s / max(1.0, laser_max_power)))
             bx, by, bw, bh = 38, 53, 88, 9
             d.rectangle((bx, by, bx + bw, by + bh), outline=255)
             if pct > 0:
@@ -456,7 +459,7 @@ def oled_worker():
             d.text((0, 22), f"FW: {fw[:16]}", font=font, fill=255)
             d.text((0, 33), f"Zust: {(last_state or '-')[:13]}", font=font, fill=255)
             d.text((0, 44), f"X{last_mpos_x:6.1f} Y{last_mpos_y:6.1f}", font=font, fill=255)
-            d.text((0, 55), f"S:{int(last_s)}  Cam:{cam_str}", font=font, fill=255)
+            d.text((0, 55), f"S:{int(eff_s)}  Cam:{cam_str}", font=font, fill=255)
 
         try:
             device.display(img)
