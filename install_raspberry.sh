@@ -39,6 +39,8 @@ sudo apt-get install -y python3 python3-venv python3-pip git
 # Beides sind System-Pakete -> per apt + venv mit --system-site-packages.
 sudo apt-get install -y python3-picamera2 || echo "Hinweis: python3-picamera2 nicht installiert (CSI-Kamera optional)."
 sudo apt-get install -y python3-opencv    || echo "Hinweis: python3-opencv nicht installiert (USB-Kamera optional)."
+# Schriftart fuer das OLED (grosse Koordinaten-Anzeige)
+sudo apt-get install -y fonts-dejavu-core || echo "Hinweis: fonts-dejavu-core nicht installiert (OLED nutzt sonst Standard-Font)."
 
 echo "==> [2/6] WebLaser von GitHub holen/aktualisieren ..."
 if [ -d "${INSTALL_DIR}/.git" ]; then

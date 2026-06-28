@@ -366,17 +366,47 @@ def oled_worker():
             print(f"DEBUG: OLED-Taster nicht aktiv: {e}")
 
     font = ImageFont.load_default()
+    # Groessere Schrift fuer Koordinaten (DejaVu, falls vorhanden) – sonst Standard-Font
+    try:
+        font_big = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+        font_med = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+    except Exception:
+        font_big = font
+        font_med = font
     # Verfuegbare Kamera-Backends einmalig ermitteln
     import importlib.util as _ilu
     _has = lambda m: _ilu.find_spec(m) is not None
     cam_str = ("CSI+USB" if _has("cv2") and _has("picamera2")
                else "USB" if _has("cv2") else "CSI" if _has("picamera2") else "-")
+
+    def _laser_warning(d):
+        # Warndreieck mit Laserstrahlungs-Symbol (links) + Text rechts
+        d.line([(30, 3), (5, 55)], fill=255, width=3)
+        d.line([(5, 55), (55, 55)], fill=255, width=3)
+        d.line([(55, 55), (30, 3)], fill=255, width=3)
+        fx, fy = 30, 49                 # Brennpunkt, von dem die Strahlen ausgehen
+        for tx, ty in [(15, 26), (22, 21), (30, 19), (38, 21), (45, 26)]:
+            d.line([(fx, fy), (tx, ty)], fill=255, width=2)
+        d.ellipse((fx - 2, fy - 2, fx + 2, fy + 2), fill=255)
+        d.text((64, 12), "LASER", font=font_med, fill=255)
+        d.text((64, 36), "AKTIV", font=font_med, fill=255)
+
     last_ip = None
     qr_img = None
     screen = 0
-    SCREENS = 3
-    print("DEBUG: OLED-Anzeige aktiv.")
+    SCREENS = 4          # 0 QR, 1 Adresse, 2 Position+Leistung, 3 System
+    blink = False
+    t_blink = time.time()
+    print("DEBUG: OLED-Anzeige aktiv (Taster zum Weiterschalten).")
     while True:
+        if advance.is_set():            # NUR per Taster weiterschalten
+            advance.clear()
+            screen = (screen + 1) % SCREENS
+        now = time.time()
+        if now - t_blink >= 1.0:         # Blink-Takt fuer die Laser-Warnung
+            blink = not blink
+            t_blink = now
+
         host = socket.gethostname()
         ip = _get_lan_ip()
         if ip != last_ip:               # QR nur bei IP-Aenderung neu erzeugen
@@ -388,9 +418,14 @@ def oled_worker():
                 qr_img = qr.make_image(fill_color="white", back_color="black").convert("1").resize((64, 64))
             except Exception:
                 qr_img = None
+
+        laser_on = (last_s > 0)
         img = Image.new("1", (device.width, device.height))
         d = ImageDraw.Draw(img)
-        if screen == 0:                 # QR-Code zur Mobilseite
+
+        if laser_on and blink:          # Sicherheits-Warnung blinkt ueber jeder Ansicht
+            _laser_warning(d)
+        elif screen == 0:               # QR-Code zur Mobilseite
             if qr_img is not None:
                 img.paste(qr_img, (0, 0))
             d.text((70, 6), "Handy:", font=font, fill=255)
@@ -402,7 +437,18 @@ def oled_worker():
             d.text((0, 20), f"{host}.local:{HTTP_PORT_OLED}", font=font, fill=255)
             d.text((0, 40), "oder:", font=font, fill=255)
             d.text((0, 52), f"{ip}:{HTTP_PORT_OLED}", font=font, fill=255)
-        else:                           # System-Status
+        elif screen == 2:               # Position (gross) + Laserleistung (Balken)
+            d.text((0, 2),  "X", font=font_med, fill=255)
+            d.text((16, 0), f"{last_mpos_x:7.1f}", font=font_big, fill=255)
+            d.text((0, 28), "Y", font=font_med, fill=255)
+            d.text((16, 26), f"{last_mpos_y:7.1f}", font=font_big, fill=255)
+            d.text((0, 53), "Laser", font=font, fill=255)
+            pct = max(0.0, min(1.0, last_s / max(1.0, laser_max_power)))
+            bx, by, bw, bh = 38, 53, 88, 9
+            d.rectangle((bx, by, bx + bw, by + bh), outline=255)
+            if pct > 0:
+                d.rectangle((bx + 1, by + 1, bx + 1 + int((bw - 2) * pct), by + bh - 1), fill=255)
+        else:                           # System-Status (Details)
             conn = (laser_serial is not None and getattr(laser_serial, "is_open", False))
             fw = (firmware_detected or "-")
             d.text((0, 0),  ("MKS: verbunden" if conn else "MKS: getrennt"), font=font, fill=255)
@@ -411,13 +457,12 @@ def oled_worker():
             d.text((0, 33), f"Zust: {(last_state or '-')[:13]}", font=font, fill=255)
             d.text((0, 44), f"X{last_mpos_x:6.1f} Y{last_mpos_y:6.1f}", font=font, fill=255)
             d.text((0, 55), f"S:{int(last_s)}  Cam:{cam_str}", font=font, fill=255)
+
         try:
             device.display(img)
         except Exception:
             pass
-        if advance.wait(timeout=OLED_CYCLE_SEC):
-            advance.clear()
-        screen = (screen + 1) % SCREENS
+        advance.wait(timeout=0.25)      # reaktiv auf Taster + Live-Aktualisierung (~4 Hz)
 
 # --- GLOBALE VARIABLEN ---
 laser_serial = None
@@ -436,6 +481,7 @@ last_state = ""                # zuletzt gemeldeter Maschinenzustand (fuer OLED)
 last_mpos_x = 0.0              # zuletzt gemeldete Maschinen-Position X (fuer OLED)
 last_mpos_y = 0.0              # zuletzt gemeldete Maschinen-Position Y (fuer OLED)
 last_s = 0.0                  # zuletzt gemeldete Laserleistung (S-Wert, fuer OLED)
+laser_max_power = 1000.0      # Maschinen-Maxpower ($30) fuer den OLED-Leistungsbalken
 
 # --- OLED-Display (optional, Raspberry Pi, I2C SSD1306 128x64) ---
 OLED_I2C_ADDR    = 0x3C        # I2C-Adresse des Displays (meist 0x3C)
@@ -921,7 +967,7 @@ def generate_gcode_from_svg(svg_string, feedrate, power, canvas_height, origin_x
 # --- SERIAL WORKER ---
 def serial_worker(loop):
     global laser_serial, connected_websocket, stop_thread, bytes_in_buffer, total_job_lines, completed_job_lines, last_progress_percent
-    global last_state, last_mpos_x, last_mpos_y, last_s
+    global last_state, last_mpos_x, last_mpos_y, last_s, laser_max_power
 
     print("DEBUG: Serial Worker gestartet.")
     last_poll_time = time.time()
@@ -942,6 +988,12 @@ def serial_worker(loop):
                     line_str = line.decode('utf-8', errors='ignore').strip()
                     if line_str:
                         _detect_firmware(line_str, loop)   # FluidNC/Grbl aus Banner/$I erkennen
+                        # Max-Power ($30) fuer den OLED-Leistungsbalken merken
+                        if line_str.startswith('$30='):
+                            try:
+                                laser_max_power = float(line_str.split('=', 1)[1])
+                            except Exception:
+                                pass
                         # Status-Polls (<...>)
                         if line_str.startswith('<'):
                             match = STATUS_RE.search(line_str)
@@ -1080,6 +1132,7 @@ async def _maybe_autoconnect(websocket, loop):
         await websocket.send(json.dumps({"type": "info", "msg": f"MKS DLC32 automatisch verbunden ({port})"}))
         await websocket.send(json.dumps({"type": "conn_info", "transport": current_transport, "connType": "usb"}))
         job_queue.append('$I')
+        job_queue.append('$$')   # Maschinendaten ($30 Maxpower, $130/$131 Arbeitsbereich) laden
         print(f"DEBUG: Auto-Verbindung MKS DLC32 an {port}")
     except Exception as e:
         print(f"DEBUG: Auto-Verbindung fehlgeschlagen: {e}")
